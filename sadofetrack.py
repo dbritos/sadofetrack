@@ -1,4 +1,4 @@
-#https://likegeeks.com/python-gui-examples-tkinter-tutorial/
+#!/usr/bin/env python
 import subprocess
 import pathlib
 import time
@@ -8,18 +8,12 @@ import urllib.request
 import sattracker3
 import re
 import pickle
-satellite_selected = False
+
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
 root.geometry('500x250')
 
-menu = Menu(root)
-new_item = Menu(menu)
-new_item.add_command(label='New')
-menu.add_cascade(label='File', menu=new_item)
-root.config(menu=menu)
-
-
+#get configuration file
 if pathlib.Path('config.pkl').is_file():
 	with open('config.pkl','rb') as f:  # Python 3: open(..., 'rb')
 	    serial_port_selected,rig_selected,rig_num = pickle.load(f)
@@ -60,6 +54,7 @@ rig.current(rig_list.index(rig_selected)) #set the selected item
 rig.grid(column=1, row=0)
 rig.bind("<<ComboboxSelected>>", selectrig)
 
+satellite_selected = False
 sat_list = list()
 list_tle = list()
 dic_tle = {}
@@ -161,7 +156,7 @@ def Control_freq():
 		cmd = "rigctl -m " + rig_num +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
 		print(cmd)  
 	#	status,output = subprocess.getstatusoutput(cmd)
-		root.after(2000, Control_freq) 
+	root.after(2000, Control_freq) 
 
 quit = Button(root, text="Quit", command = root.destroy)
 quit.grid(column=3, row=7)
