@@ -21,6 +21,7 @@ else:
 	serial_port_selected="/dev/tty0"
 	rig_selected="FLRig"
 
+#get serial port
 def select_serial_port(event):
 	global serial_port_selected
 	serial_port_selected=event.widget.get()
@@ -33,6 +34,8 @@ serial_port.current(1) #set the selected item
 serial_port.grid(column=0, row=0)
 serial_port.bind("<<ComboboxSelected>>", select_serial_port)
 serial_port.current(serial_port_list.index(serial_port_selected))
+
+#get rig
 def selectrig(event):
 	global rig_selected
 	rig_selected = event.widget.get()
@@ -45,15 +48,18 @@ dic_rig = {}
 status,output = subprocess.getstatusoutput("rigctld -l | grep -v '^[1-9]'")
 rigs = output.split('\n')
 for r in rigs:
-	r = r.split()
-	if len(r) == 5:
-		rig_list.append(r[2])
-		dic_rig[r[2]]=r[0]
+	if len(r) >= 70:
+		name = r[28:51].rstrip().lstrip()
+		number =r[0:7].rstrip().lstrip()
+		rig_list.append(name)
+		dic_rig[name]=number
+
 rig['values']= rig_list
 rig.current(rig_list.index(rig_selected)) #set the selected item
 rig.grid(column=1, row=0)
 rig.bind("<<ComboboxSelected>>", selectrig)
 
+#get satellite
 satellite_selected = False
 sat_list = list()
 list_tle = list()
@@ -72,7 +78,6 @@ for itn in range(0,len(list_tle),3):
 	nserie=list_tle[itn+1].split()[1]
 	item_tle = {"name": list_tle[itn].rstrip(),"tle1":list_tle[itn+1], "tle2":list_tle[itn+2]}
 	dic_tle[nserie.rstrip()] = item_tle	
-
 
 file = urllib.request.urlopen("http://www.ne.jp/asahi/hamradio/je9pel/satslist.csv")
 for line in file:
@@ -102,16 +107,16 @@ satellite['values'] = sat_list
 satellite.current(1) #set the selected item
 satellite.grid(column=0, row=1)
 
+#save configuration
 def save_data():
-
 	with open('config.pkl', 'wb') as f: 
 	    pickle.dump([serial_port_selected,rig_selected,rig_num], f)
-	print(serial_port_selected,rig_selected,rig_num)
-    
 
 save = Button(root, text="Save", command=save_data)
 save.grid(column=3, row=0)
 start_es = False
+
+#start tracking
 def start_scn():
 	ec1_tle = dic_fqc[satellite.get()]["tle"]
 	global f0
@@ -125,12 +130,14 @@ def start_scn():
 start = Button(root, text="Start", command=start_scn)
 start.grid(column=2, row=2)
 
+#stop tracking
 def stop_scn():
 	global start_es
 	start_es = False
 stop = Button(root, text="Stop", command=stop_scn)
 stop.grid(column=3, row=2)
 
+#get parameter and control frequency receiver
 Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 20))
 Azimut.grid(row=3, columnspan=3,sticky=W)
 Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 20))
@@ -155,7 +162,7 @@ def Control_freq():
 		FreqDownload.configure(text=FD)
 		cmd = "rigctl -m " + rig_num +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
 		print(cmd)  
-	#	status,output = subprocess.getstatusoutput(cmd)
+		status,output = subprocess.getstatusoutput(cmd)
 	root.after(2000, Control_freq) 
 
 quit = Button(root, text="Quit", command = root.destroy)
