@@ -120,7 +120,8 @@ start_es = False
 def start_scn():
 	ec1_tle = dic_fqc[satellite.get()]["tle"]
 	global f0
-	f0 = int(re.split('[*-/]',dic_fqc[satellite.get()]["Downlink"])[0])*1000000
+	
+	f0 = float(re.split('[-/]',dic_fqc[satellite.get()]["Downlink"])[0])*1000000
 	tallinn = ("-31.319493", "-64.273951", "500")
 	global tracker
 	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
@@ -161,7 +162,7 @@ def Control_freq():
 		FD="Frequency Download:"+str(int(frec)) + " Hz"
 		FreqDownload.configure(text=FD)
 		cmd = "rigctl -m " + rig_num +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
-		print(cmd)  
+		print(cmd) 
 		status,output = subprocess.getstatusoutput(cmd)
 	root.after(2000, Control_freq) 
 
