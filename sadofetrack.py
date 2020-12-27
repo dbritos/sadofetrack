@@ -11,15 +11,18 @@ import pickle
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
-root.geometry('500x250')
+root.geometry('500x300')
 
 #get configuration file
 if pathlib.Path('config.pkl').is_file():
 	with open('config.pkl','rb') as f:  # Python 3: open(..., 'rb')
-	    serial_port_selected,rig_selected,rig_num = pickle.load(f)
+	    serial_port_selected,rig_selected,rig_num,lat,lon = pickle.load(f)
 else:
 	serial_port_selected="/dev/tty0"
 	rig_selected="FLRig"
+	rig_num=4
+	lat = -31.319493
+	lon = -64.273951
 
 #get serial port
 def select_serial_port(event):
@@ -59,7 +62,24 @@ rig.current(rig_list.index(rig_selected)) #set the selected item
 rig.grid(column=1, row=0)
 rig.bind("<<ComboboxSelected>>", selectrig)
 
+#get local coordinates
+lat_lb = Label(root, text="Latitude:")
+lat_lb.grid(row=1, column=0,sticky=W)
+lat_entry= Entry(root)
+lat_entry.insert(0, str(lat))
+lat_entry.grid(row=1, column=1,sticky=W)
+lon_lb = Label(root, text="Longitude:")
+lon_lb.grid(row=2, column=0,sticky=W)
+lon_entry= Entry(root)
+lon_entry.insert(0, str(lon))
+lon_entry.grid(row=2, column=1,sticky=W)
+
+#get frequency
+frequency  = Combobox(root)
+frequency.grid(column=1, row=3)
+
 #get satellite
+
 satellite_selected = False
 sat_list = list()
 list_tle = list()
@@ -102,15 +122,48 @@ for itn in range(0,len(list_fqc)):
 			nr=0
 for l in dic_fqc.keys(): sat_list.append(l)	
 
+def selec_frequency(event):
+	global f0
+	f0 = float(event.widget.get())*1000000
+
+def selec_satellite(event):
+	global ec1_tle
+	global f0
+	ec1_tle = dic_fqc[event.widget.get()]["tle"]
+	frequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
+	frequencys[:] = [item for item in frequencys if item != '']
+	frequency['values'] =frequencys
+	frequency.current(0)
+	f0 = float(frequencys[0])*1000000
+	frequency.bind("<<ComboboxSelected>>", selec_frequency)
+#save configuration
+
 satellite = Combobox(root)
 satellite['values'] = sat_list
 satellite.current(1) #set the selected item
-satellite.grid(column=0, row=1)
-
+satellite.grid(column=0, row=3)
+satellite.bind("<<ComboboxSelected>>", selec_satellite)
 #save configuration
 def save_data():
+	global lat
+	global lon
+	try:
+		if (float(lat_entry.get()) >= -90) and (float(lat_entry.get())) <= 90:
+			lat = lat_entry.get()
+			
+		else:
+			lat_entry.insert(0, "ERROR")
+	except: lat_entry.insert(0, "ERROR")
+	try:
+		if float(lon_entry.get()) >= -180 and float(lon_entry.get()) <= 180:
+			lon = lon_entry.get()
+		
+		else:
+			lon_entry.insert(0, "ERROR")
+	except:	lon = lon_entry.get()
+
 	with open('config.pkl', 'wb') as f: 
-	    pickle.dump([serial_port_selected,rig_selected,rig_num], f)
+	    pickle.dump([serial_port_selected,rig_selected,rig_num,lat,lon], f)
 
 save = Button(root, text="Save", command=save_data)
 save.grid(column=3, row=0)
@@ -118,35 +171,35 @@ start_es = False
 
 #start tracking
 def start_scn():
-	ec1_tle = dic_fqc[satellite.get()]["tle"]
-	global f0
-	
-	f0 = float(re.split('[-/]',dic_fqc[satellite.get()]["Downlink"])[0])*1000000
-	tallinn = ("-31.319493", "-64.273951", "500")
+#	ec1_tle = dic_fqc[satellite.get()]["tle"]
+#	global f0
+
+#	f0 = float(re.split('[\*\-/]',dic_fqc[satellite.get()]["Downlink"])[0])*1000000
+	tallinn = (lat,lon, "500")
 	global tracker
 	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
 	global start_es
 	start_es = True
 
 start = Button(root, text="Start", command=start_scn)
-start.grid(column=2, row=2)
+start.grid(column=2, row=4)
 
 #stop tracking
 def stop_scn():
 	global start_es
 	start_es = False
 stop = Button(root, text="Stop", command=stop_scn)
-stop.grid(column=3, row=2)
+stop.grid(column=3, row=4)
 
 #get parameter and control frequency receiver
 Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 20))
-Azimut.grid(row=3, columnspan=3,sticky=W)
+Azimut.grid(row=5, columnspan=3,sticky=W)
 Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 20))
-Elevation.grid(row=4, columnspan=3,sticky=W)
+Elevation.grid(row=6, columnspan=3,sticky=W)
 Range = Label(root, text="Range             :",font=("Arial Bold", 20))
-Range.grid(row=5, columnspan=3,sticky=W)
+Range.grid(row=7, columnspan=3,sticky=W)
 FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 20))
-FreqDownload.grid(row=6, columnspan=3,sticky=W)
+FreqDownload.grid(row=8, columnspan=3,sticky=W)
 def Control_freq():
 	
 	if start_es:
@@ -161,13 +214,13 @@ def Control_freq():
 		frec = tracker.doppler(100e6)*f0/100000000+f0
 		FD="Frequency Download:"+str(int(frec)) + " Hz"
 		FreqDownload.configure(text=FD)
-		cmd = "rigctl -m " + rig_num +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
+		cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
 		print(cmd) 
 		status,output = subprocess.getstatusoutput(cmd)
 	root.after(2000, Control_freq) 
 
 quit = Button(root, text="Quit", command = root.destroy)
-quit.grid(column=3, row=7)
+quit.grid(column=3, row=9)
 		
 root.after(2000, Control_freq) 
 root.mainloop()
