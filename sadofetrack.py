@@ -8,6 +8,77 @@ import urllib.request
 import sattracker3
 import re
 import pickle
+def select_serial_port(event):
+	global serial_port_selected
+	serial_port_selected=event.widget.get()
+
+def selectrig(event):
+	global rig_selected
+	rig_selected = event.widget.get()
+	global rig_num
+	rig_num = dic_rig[rig_selected]
+
+def selec_satellite(event):
+	global ec1_tle
+	global Mode_tx
+	ec1_tle = dic_fqc[event.widget.get()]["tle"]
+	frequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
+	frequencys[:] = [item for item in frequencys if item != '']
+	frequency['values'] =frequencys#	f0 = float(frequency.get())*1000000
+	Mode_tx = dic_fqc[event.widget.get()]["Mode"]
+
+def save_data():
+	global lat
+	global lon
+	try:
+		if (float(lat_entry.get()) >= -90) and (float(lat_entry.get())) <= 90:
+			lat = lat_entry.get()
+			
+		else:
+			lat_entry.insert(0, "ERROR")
+	except: lat_entry.insert(0, "ERROR")
+	try:
+		if float(lon_entry.get()) >= -180 and float(lon_entry.get()) <= 180:
+			lon = lon_entry.get()
+		
+		else:
+			lon_entry.insert(0, "ERROR")
+	except:	lon = lon_entry.get()
+
+	with open('config.pkl', 'wb') as f: 
+	    pickle.dump([serial_port_selected,rig_selected,rig_num,lat,lon], f)
+
+def start_scn():
+	tallinn = (lat,lon, "500")
+	global tracker
+	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
+	global start_es
+	start_es = True
+
+def stop_scn():
+	global start_es
+	start_es = False
+
+def Control_freq():
+	if start_es:
+		tracker.set_epoch(time.time())
+		Az = "Azimut            :"+str(int(tracker.azimuth()))
+		Azimut.configure(text=Az)
+		El = "Elevation         :"+str(int(tracker.elevation()))
+		Elevation.configure(text=El)
+		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
+		Range.configure(text=Ra)
+		f0 =float(frequency.get())*1000000
+		frec = tracker.doppler(100e6)*f0/100000000+f0
+		FD="Frequency Download:"+str(int(frec)) + " Hz"
+		FreqDownload.configure(text=FD)
+		Mo = "Mode              :" + Mode_tx
+		Mode. configure(text=Mo)
+		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
+		else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
+		print(cmd) 
+		status,output = subprocess.getstatusoutput(cmd)
+	root.after(2000, Control_freq) 
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
@@ -18,17 +89,13 @@ if pathlib.Path('config.pkl').is_file():
 	with open('config.pkl','rb') as f:  # Python 3: open(..., 'rb')
 	    serial_port_selected,rig_selected,rig_num,lat,lon = pickle.load(f)
 else:
-	serial_port_selected="/dev/tty0"
+	serial_port_selected=""
 	rig_selected="FLRig"
 	rig_num=4
 	lat = -31.319493
 	lon = -64.273951
 
 #get serial port
-def select_serial_port(event):
-	global serial_port_selected
-	serial_port_selected=event.widget.get()
-
 serial_port = Combobox(root)
 status,output = subprocess.getstatusoutput("ls /dev/tty*")
 serial_port_list =output.split('\n')
@@ -36,14 +103,9 @@ serial_port['values']= serial_port_list
 serial_port.current(1) #set the selected item
 serial_port.grid(column=0, row=0,columnspan=2)
 serial_port.bind("<<ComboboxSelected>>", select_serial_port)
-serial_port.current(serial_port_list.index(serial_port_selected))
+#serial_port.current(serial_port_list.index(serial_port_selected))
 
 #get rig
-def selectrig(event):
-	global rig_selected
-	rig_selected = event.widget.get()
-	global rig_num
-	rig_num = dic_rig[rig_selected]
 rig = Combobox(root)
 rig_list = list()
 rig_listn = list()
@@ -121,26 +183,14 @@ for itn in range(0,len(list_fqc)):
 			nr=0
 for l in dic_fqc.keys(): sat_list.append(l)	
 
-def selec_frequency(event):
-	global f0
-	f0 = float(event.widget.get())*1000000
+
 
 #get frequency
 frequency  = Combobox(root)
 frequency.grid(column=2, row=3,columnspan=2)
-frequency.bind("<<ComboboxSelected>>", selec_frequency)
 frequency['values'] ="437.229"
 frequency.current(0)
-def selec_satellite(event):
-	global ec1_tle
-	global f0
-	global Mode_tx
-	ec1_tle = dic_fqc[event.widget.get()]["tle"]
-	frequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
-	frequencys[:] = [item for item in frequencys if item != '']
-	frequency['values'] =frequencys
-	f0 = float(frequencys[0])*1000000
-	Mode_tx = dic_fqc[event.widget.get()]["Mode"]
+
 
 
 satellite = Combobox(root)
@@ -149,50 +199,20 @@ satellite.current(1) #set the selected item
 satellite.grid(column=0, row=3,columnspan=2)
 satellite.bind("<<ComboboxSelected>>", selec_satellite)
 #save configuration
-def save_data():
-	global lat
-	global lon
-	try:
-		if (float(lat_entry.get()) >= -90) and (float(lat_entry.get())) <= 90:
-			lat = lat_entry.get()
-			
-		else:
-			lat_entry.insert(0, "ERROR")
-	except: lat_entry.insert(0, "ERROR")
-	try:
-		if float(lon_entry.get()) >= -180 and float(lon_entry.get()) <= 180:
-			lon = lon_entry.get()
-		
-		else:
-			lon_entry.insert(0, "ERROR")
-	except:	lon = lon_entry.get()
 
-	with open('config.pkl', 'wb') as f: 
-	    pickle.dump([serial_port_selected,rig_selected,rig_num,lat,lon], f)
 
 save = Button(root, text="Save", command=save_data)
 save.grid(column=5, row=0)
 start_es = False
 
 #start tracking
-def start_scn():
-#	ec1_tle = dic_fqc[satellite.get()]["tle"]
-#	global f0
 
-#	f0 = float(re.split('[\*\-/]',dic_fqc[satellite.get()]["Downlink"])[0])*1000000
-	tallinn = (lat,lon, "500")
-	global tracker
-	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
-	global start_es
-	start_es = True
 
 start = Button(root, text="Start", command=start_scn)
 start.grid(column=5, row=3)
 
 #stop tracking
-def stop_scn():
-	global start_es
-	start_es = False
+
 stop = Button(root, text="Stop", command=stop_scn)
 stop.grid(column=6, row=3)
 
@@ -209,27 +229,7 @@ Mode = Label(root, text="Mode              :",font=("Arial Bold", 20))
 Mode.grid(row=9, columnspan=7,sticky=W)
 
 
-def Control_freq():
-	
-	if start_es:
-		tracker.set_epoch(time.time())
-		Az = "Azimut            :"+str(int(tracker.azimuth()))
-		Azimut.configure(text=Az)
-		El = "Elevation         :"+str(int(tracker.elevation()))
-		Elevation.configure(text=El)
-		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
-		Range.configure(text=Ra)
-#		print ("range rate : %0.3f km/s" % (tracker.satellite.range_velocity/1000))
-		frec = tracker.doppler(100e6)*f0/100000000+f0
-		FD="Frequency Download:"+str(int(frec)) + " Hz"
-		FreqDownload.configure(text=FD)
-		Mo = "Mode              :" + Mode_tx
-		Mode. configure(text=Mo)		
-		cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
-		print(cmd) 
-		status,output = subprocess.getstatusoutput(cmd)
 
-	root.after(2000, Control_freq) 
 
 quit = Button(root, text="Quit", command = root.destroy)
 quit.grid(column=6, row=10)
