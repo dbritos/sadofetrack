@@ -72,17 +72,37 @@ def Control_freq():
 		frec = tracker.doppler(100e6)*f0/100000000+f0
 		FD="Frequency Download:"+str(int(frec)) + " Hz"
 		FreqDownload.configure(text=FD)
+		FD="Frequency Upload  :"+str(int(frec)) + " Hz"
+		FreqUpload.configure(text=FD)		
 		Mo = "Mode              :" + Mode_tx
 		Mode. configure(text=Mo)
-		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
-		else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" 
+		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(frec)) + " M " + "FM" + " " + "8000"  + " V VFOA"
+		else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" + " V VFOA"
 		print(cmd) 
 		status,output = subprocess.getstatusoutput(cmd)
-	root.after(2000, Control_freq) 
+	root.after(5000, Control_freq) 
+
+def SearchNear():
+	tallinn = (lat,lon, "500")
+	global tracker
+	SatellNear = list()
+	for l in dic_fqc:
+		ec1_tle = dic_fqc[l]["tle"]
+		tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
+		tracker.set_epoch(time.time())
+		elev = tracker.elevation()
+		rang = tracker.range()
+		if elev >=1:
+			SatellNear.append(str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+	for d in range(len(SatellNear)):
+		SatNear.delete('end')
+	for Sat in SatellNear:
+		SatNear.insert('end',Sat)
+	root.after(1000, SearchNear) 
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
-root.geometry('600x300')
+root.geometry('600x700')
 
 #get configuration file
 if pathlib.Path('config.pkl').is_file():
@@ -96,16 +116,20 @@ else:
 	lon = -64.273951
 
 #get serial port
+lab_serial = Label(root, text="Serial Port:")
+lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
 serial_port = Combobox(root)
 status,output = subprocess.getstatusoutput("ls /dev/tty*")
 serial_port_list =output.split('\n')
 serial_port['values']= serial_port_list
 serial_port.current(1) #set the selected item
-serial_port.grid(column=0, row=0,columnspan=2)
+serial_port.grid(column=1, row=0,sticky=W,  columnspan=2)
 serial_port.bind("<<ComboboxSelected>>", select_serial_port)
 #serial_port.current(serial_port_list.index(serial_port_selected))
 
 #get rig
+lab_rig = Label(root, text="Transceiver:")
+lab_rig.grid(row=0, column=3,sticky=W,columnspan=1)
 rig = Combobox(root)
 rig_list = list()
 rig_listn = list()
@@ -121,24 +145,24 @@ for r in rigs:
 
 rig['values']= rig_list
 rig.current(rig_list.index(rig_selected)) #set the selected item
-rig.grid(column=2, row=0,columnspan=2)
+rig.grid(column=4, row=0,columnspan=2)
 rig.bind("<<ComboboxSelected>>", selectrig)
 
 #get local coordinates
 lat_lb = Label(root, text="Latitude:")
-lat_lb.grid(row=1, column=0,sticky=W,columnspan=2)
+lat_lb.grid(row=1, column=0,sticky=W,columnspan=1)
 lat_entry= Entry(root)
 lat_entry.insert(0, str(lat))
-lat_entry.grid(row=1, column=2,sticky=W,columnspan=2)
+lat_entry.grid(row=1, column=1,sticky=W,columnspan=2)
 lon_lb = Label(root, text="Longitude:")
-lon_lb.grid(row=2, column=0,sticky=W,columnspan=2)
+lon_lb.grid(row=1, column=3,sticky=W,columnspan=1)
 lon_entry= Entry(root)
 lon_entry.insert(0, str(lon))
-lon_entry.grid(row=2, column=2,sticky=W,columnspan=2)
+lon_entry.grid(row=1, column=4,sticky=W,columnspan=2)
 
 
 
-
+Separator(root).place(x=0, y=47, relwidth=1)
 #get satellite
 
 satellite_selected = False
@@ -186,30 +210,39 @@ for l in dic_fqc.keys(): sat_list.append(l)
 
 
 #get frequency
+lab_frequencyD = Label(root, text="Downlad Frequency:")
+lab_frequencyD.grid(column=0, row=3,columnspan=1,)
 frequency  = Combobox(root)
-frequency.grid(column=2, row=3,columnspan=2)
+frequency.grid(column=1, row=3,columnspan=2)
 frequency['values'] ="437.229"
 frequency.current(0)
+lab_frequencyU = Label(root, text="Upload Frequency:")
+lab_frequencyU.grid(column=3, row=3,columnspan=1)
+frequencyU  = Combobox(root)
+frequencyU.grid(column=4, row=3,columnspan=2)
+frequencyU['values'] ="437.229"
+frequencyU.current(0)
 
-
+lab_satellite = Label(root, text="Satellite:")
+lab_satellite.grid(column=0, row=2,columnspan=1)
 
 satellite = Combobox(root)
 satellite['values'] = sat_list
 satellite.current(1) #set the selected item
-satellite.grid(column=0, row=3,columnspan=2)
+satellite.grid(column=1, row=2,columnspan=2)
 satellite.bind("<<ComboboxSelected>>", selec_satellite)
 #save configuration
 
 
 save = Button(root, text="Save", command=save_data)
-save.grid(column=5, row=0)
+save.grid(column=6, row=0)
 start_es = False
 
 #start tracking
 
 
 start = Button(root, text="Start", command=start_scn)
-start.grid(column=5, row=3)
+start.grid(column=6, row=2)
 
 #stop tracking
 
@@ -217,22 +250,25 @@ stop = Button(root, text="Stop", command=stop_scn)
 stop.grid(column=6, row=3)
 
 #get parameter and control frequency receiver
-Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 20))
-Azimut.grid(row=5, columnspan=7,sticky=W)
-Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 20))
-Elevation.grid(row=6, columnspan=7,sticky=W)
-Range = Label(root, text="Range             :",font=("Arial Bold", 20))
-Range.grid(row=7, columnspan=7,sticky=W)
-FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 20))
-FreqDownload.grid(row=8, columnspan=7,sticky=W)
-Mode = Label(root, text="Mode              :",font=("Arial Bold", 20))
-Mode.grid(row=9, columnspan=7,sticky=W)
+Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 16))
+Azimut.grid(row=6, columnspan=7,sticky=W)
+Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 16))
+Elevation.grid(row=7, columnspan=7,sticky=W)
+Range = Label(root, text="Range             :",font=("Arial Bold", 16))
+Range.grid(row=8, columnspan=7,sticky=W)
+FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 16))
+FreqDownload.grid(row=9, columnspan=7,sticky=W)
+FreqUpload = Label(root, text="Frequency Upload  :",font=("Arial Bold", 16))
+FreqUpload.grid(row=10, columnspan=7,sticky=W)
+Mode = Label(root, text="Mode              :",font=("Arial Bold", 16))
+Mode.grid(row=11, columnspan=7,sticky=W)
 
-
-
+SatNear = Listbox(root, height=15, width=60,font=("TkFixedFont", 16))
+SatNear.grid(row=12, columnspan=7,sticky=W)
 
 quit = Button(root, text="Quit", command = root.destroy)
-quit.grid(column=6, row=10)
-		
-root.after(2000, Control_freq) 
+quit.grid(column=6, row=13)
+
+root.after(2000, SearchNear) 		
+root.after(5000, Control_freq) 
 root.mainloop()
