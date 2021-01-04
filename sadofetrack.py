@@ -21,37 +21,45 @@ def selectrig(event):
 def selec_satellite(event):
 	global ec1_tle
 	global Mode_tx
+	global tracker
 	ec1_tle = dic_fqc[event.widget.get()]["tle"]
-	frequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
-	frequencys[:] = [item for item in frequencys if item != '']
-	frequency['values'] =frequencys#	f0 = float(frequency.get())*1000000
+	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
+	tracker.set_epoch(time.time())
+	Dfrequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
+	Dfrequencys[:] = [item for item in Dfrequencys if item != '']
+	Dfrequency['values'] = Dfrequencys
+
+	Dfrequency.current(0)
+	Ufrequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Uplink"])
+	Ufrequencys[:] = [item for item in Ufrequencys if item != '']
+	Ufrequency['values'] = Ufrequencys
+
+	Ufrequency.current(0)
 	Mode_tx = dic_fqc[event.widget.get()]["Mode"]
 
 def save_data():
-	global lat
-	global lon
+	global tallinn
+
 	try:
 		if (float(lat_entry.get()) >= -90) and (float(lat_entry.get())) <= 90:
 			lat = lat_entry.get()
-			
+
 		else:
 			lat_entry.insert(0, "ERROR")
 	except: lat_entry.insert(0, "ERROR")
 	try:
 		if float(lon_entry.get()) >= -180 and float(lon_entry.get()) <= 180:
 			lon = lon_entry.get()
-		
+
 		else:
 			lon_entry.insert(0, "ERROR")
 	except:	lon = lon_entry.get()
-
-	with open('config.pkl', 'wb') as f: 
-	    pickle.dump([serial_port_selected,rig_selected,rig_num,lat,lon], f)
+	tallinn = (lat,lon, "500")
+	with open('config.pkl', 'wb') as f:
+	    pickle.dump([serial_port_selected,rig_selected,rig_num,tallinn], f)
 
 def start_scn():
-	tallinn = (lat,lon, "500")
-	global tracker
-	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
+
 	global start_es
 	start_es = True
 
@@ -61,6 +69,7 @@ def stop_scn():
 
 def Control_freq():
 	if start_es:
+		tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
 		tracker.set_epoch(time.time())
 		Az = "Azimut            :"+str(int(tracker.azimuth()))
 		Azimut.configure(text=Az)
@@ -68,24 +77,26 @@ def Control_freq():
 		Elevation.configure(text=El)
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
-		f0 =float(frequency.get())*1000000
-		frec = tracker.doppler(100e6)*f0/100000000+f0
-		FD="Frequency Download:"+str(int(frec)) + " Hz"
+		Df0  =float(Dfrequency.get())*1000000
+		Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
+		FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
 		FreqDownload.configure(text=FD)
-		FD="Frequency Upload  :"+str(int(frec)) + " Hz"
-		FreqUpload.configure(text=FD)		
+		Uf0  =float(Ufrequency.get())*1000000
+		Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
+		FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
+		FreqUpload.configure(text=FU)
 		Mo = "Mode              :" + Mode_tx
 		Mode. configure(text=Mo)
-		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(frec)) + " M " + "FM" + " " + "8000"  + " V VFOA"
-		else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(frec)) + " M " + "FM" + " " + "8000" + " V VFOA"
-		print(cmd) 
+		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(Dfrec)) + " M " + "FM" + " " + "8000"  + " V VFOA"
+		else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected +" F " + str(int(Dfrec)) + " M " + "FM" + " " + "8000" + " V VFOA"
+		print(cmd)
 		status,output = subprocess.getstatusoutput(cmd)
-	root.after(5000, Control_freq) 
+	root.after(5000, Control_freq)
 
 def SearchNear():
-	tallinn = (lat,lon, "500")
-	global tracker
-	SatellNear = list()
+
+	global SatNearList
+	SatNearList.clear()
 	for l in dic_fqc:
 		ec1_tle = dic_fqc[l]["tle"]
 		tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
@@ -93,12 +104,13 @@ def SearchNear():
 		elev = tracker.elevation()
 		rang = tracker.range()
 		if elev >=1:
-			SatellNear.append(str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
-	for d in range(len(SatellNear)):
+			SatNearList.append([l,elev,rang])
+	#		SatellNear.append(str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+	for d in range(SatNear.size()):
 		SatNear.delete('end')
-	for Sat in SatellNear:
-		SatNear.insert('end',Sat)
-	root.after(1000, SearchNear) 
+	for l in SatNearList:
+		SatNear.insert('end',str(l[0]).ljust(40)[:40] + "  " + str(int(l[1])).ljust(4)[:4] + "   " + str(int(l[2]/1000)).ljust(10)[:10])
+	root.after(1000, SearchNear)
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
@@ -107,14 +119,13 @@ root.geometry('600x700')
 #get configuration file
 if pathlib.Path('config.pkl').is_file():
 	with open('config.pkl','rb') as f:  # Python 3: open(..., 'rb')
-	    serial_port_selected,rig_selected,rig_num,lat,lon = pickle.load(f)
+	    serial_port_selected,rig_selected,rig_num,tallinn = pickle.load(f)
 else:
 	serial_port_selected=""
 	rig_selected="FLRig"
 	rig_num=4
-	lat = -31.319493
-	lon = -64.273951
-
+	tallinn = (-31.319493,-64.273951, "500")
+SatNearList = list()
 #get serial port
 lab_serial = Label(root, text="Serial Port:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
@@ -152,17 +163,16 @@ rig.bind("<<ComboboxSelected>>", selectrig)
 lat_lb = Label(root, text="Latitude:")
 lat_lb.grid(row=1, column=0,sticky=W,columnspan=1)
 lat_entry= Entry(root)
-lat_entry.insert(0, str(lat))
+lat_entry.insert(0, str(tallinn[0]))
 lat_entry.grid(row=1, column=1,sticky=W,columnspan=2)
 lon_lb = Label(root, text="Longitude:")
 lon_lb.grid(row=1, column=3,sticky=W,columnspan=1)
 lon_entry= Entry(root)
-lon_entry.insert(0, str(lon))
+lon_entry.insert(0, str(tallinn[1]))
 lon_entry.grid(row=1, column=4,sticky=W,columnspan=2)
 
-
-
 Separator(root).place(x=0, y=47, relwidth=1)
+
 #get satellite
 
 satellite_selected = False
@@ -177,25 +187,25 @@ for line in file:
 
 file = urllib.request.urlopen("https://www.amsat.org/tle/current/nasabare.txt")
 for line in file:
-	list_tle.append(line.decode('utf-8').rstrip('\n\r'))	
+	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
 
-for itn in range(0,len(list_tle),3): 
+for itn in range(0,len(list_tle),3):
 	nserie=list_tle[itn+1].split()[1]
 	item_tle = {"name": list_tle[itn].rstrip(),"tle1":list_tle[itn+1], "tle2":list_tle[itn+2]}
-	dic_tle[nserie.rstrip()] = item_tle	
+	dic_tle[nserie.rstrip()] = item_tle
 
 file = urllib.request.urlopen("http://www.ne.jp/asahi/hamradio/je9pel/satslist.csv")
 for line in file:
 	l1=line.decode('utf-8').rstrip('\n\r').split(";")
 	list_fqc.append(l1)
 nr = 0
-for itn in range(0,len(list_fqc)): 
+for itn in range(0,len(list_fqc)):
 	if (list_fqc[itn][7] == "active") and (list_fqc[itn][1]+"U" in dic_tle.keys()):
 		item_fqc = {"satellite": list_fqc[itn][0].rstrip(),
-		"Number":list_fqc[itn][1], 
+		"Number":list_fqc[itn][1],
 		"Uplink":list_fqc[itn][2],
 		"Downlink":list_fqc[itn][3],
-		"Beacon":list_fqc[itn][4], 
+		"Beacon":list_fqc[itn][4],
 		"Mode":list_fqc[itn][5],
 		"Callsign":list_fqc[itn][6],
 		"tle": dic_tle[list_fqc[itn][1]+"U"]}
@@ -205,23 +215,23 @@ for itn in range(0,len(list_fqc)):
 		else:
 			dic_fqc[list_fqc[itn][0]] = item_fqc
 			nr=0
-for l in dic_fqc.keys(): sat_list.append(l)	
+for l in dic_fqc.keys(): sat_list.append(l)
 
 
 
 #get frequency
 lab_frequencyD = Label(root, text="Downlad Frequency:")
 lab_frequencyD.grid(column=0, row=3,columnspan=1,)
-frequency  = Combobox(root)
-frequency.grid(column=1, row=3,columnspan=2)
-frequency['values'] ="437.229"
-frequency.current(0)
+Dfrequency  = Combobox(root)
+Dfrequency.grid(column=1, row=3,columnspan=2)
+#Dfrequency['values'] ="437.229"
+#Dfrequency.current(0)
 lab_frequencyU = Label(root, text="Upload Frequency:")
 lab_frequencyU.grid(column=3, row=3,columnspan=1)
-frequencyU  = Combobox(root)
-frequencyU.grid(column=4, row=3,columnspan=2)
-frequencyU['values'] ="437.229"
-frequencyU.current(0)
+Ufrequency  = Combobox(root)
+Ufrequency.grid(column=4, row=3,columnspan=2)
+#Ufrequency['values'] ="437.229"
+#Ufrequency.current(0)
 
 lab_satellite = Label(root, text="Satellite:")
 lab_satellite.grid(column=0, row=2,columnspan=1)
@@ -269,6 +279,6 @@ SatNear.grid(row=12, columnspan=7,sticky=W)
 quit = Button(root, text="Quit", command = root.destroy)
 quit.grid(column=6, row=13)
 
-root.after(2000, SearchNear) 		
-root.after(5000, Control_freq) 
+root.after(2000, SearchNear)
+root.after(5000, Control_freq)
 root.mainloop()
