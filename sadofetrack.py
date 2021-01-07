@@ -18,24 +18,39 @@ def selectrig(event):
 	global rig_num
 	rig_num = dic_rig[rig_selected]
 
-def selec_satellite(event):
+def get_satellite(SatAct):
+
 	global ec1_tle
 	global Mode_tx
 	global tracker
-	ec1_tle = dic_fqc[event.widget.get()]["tle"]
+	ec1_tle = dic_fqc[SatAct]["tle"]
 	tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
 	tracker.set_epoch(time.time())
-	Dfrequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Downlink"])
+	Dfrequencys = re.split('[\*\-/]',dic_fqc[SatAct]["Downlink"])
 	Dfrequencys[:] = [item for item in Dfrequencys if item != '']
 	Dfrequency['values'] = Dfrequencys
-
-	Dfrequency.current(0)
-	Ufrequencys = re.split('[\*\-/]',dic_fqc[event.widget.get()]["Uplink"])
+	if Dfrequencys:Dfrequency.current(0)
+	Ufrequencys = re.split('[\*\-/]',dic_fqc[SatAct]["Uplink"])
 	Ufrequencys[:] = [item for item in Ufrequencys if item != '']
 	Ufrequency['values'] = Ufrequencys
+	if Ufrequencys:Ufrequency.current(0)
+	Mode_tx = dic_fqc[SatAct]["Mode"]
 
-	Ufrequency.current(0)
-	Mode_tx = dic_fqc[event.widget.get()]["Mode"]
+def selec_satellite(event):
+	global SatelliteAct
+	event.widget.get()
+	SatelliteAct = event.widget.get()
+	get_satellite(SatelliteAct)
+
+def SatNearSelected(event):
+	global SatelliteAct
+	selection =event.widget.curselection()
+	if selection:
+		index =  selection[0]
+		value = event.widget.get(index)
+		SatelliteAct = value[:40].strip()
+		get_satellite(SatelliteAct)
+
 
 def save_data():
 	global tallinn
@@ -71,20 +86,26 @@ def Control_freq():
 	if start_es:
 		tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
 		tracker.set_epoch(time.time())
+		Sa = "Satellite         :" + SatelliteAct
+		SatLabel.configure(text=Sa)
 		Az = "Azimut            :"+str(int(tracker.azimuth()))
 		Azimut.configure(text=Az)
 		El = "Elevation         :"+str(int(tracker.elevation()))
 		Elevation.configure(text=El)
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
-		Df0  =float(Dfrequency.get())*1000000
-		Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
-		FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
-		FreqDownload.configure(text=FD)
-		Uf0  =float(Ufrequency.get())*1000000
-		Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
-		FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
-		FreqUpload.configure(text=FU)
+		if Dfrequency.get():
+			Df0  =float(Dfrequency.get())*1000000
+			Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
+			FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
+			FreqDownload.configure(text=FD)
+		else:Dfrec =0
+		if Ufrequency.get():
+			Uf0  =float(Ufrequency.get())*1000000
+			Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
+			FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
+			FreqUpload.configure(text=FU)
+		else:Ufrec =0
 		Mo = "Mode              :" + Mode_tx
 		Mode. configure(text=Mo)
 		if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " F " + str(int(Dfrec)) + " M " + "FM" + " " + "8000"  + " V VFOA"
@@ -93,23 +114,36 @@ def Control_freq():
 		status,output = subprocess.getstatusoutput(cmd)
 	root.after(5000, Control_freq)
 
-def SearchNear():
+def calctracker(sat):
+	tle = dic_fqc[sat]["tle"]
+	trackers = sattracker3.Tracker(satellite=tle, groundstation=tallinn)
+	trackers.set_epoch(time.time())
+	return(trackers)
 
+def SearchNear():
 	global SatNearList
-	SatNearList.clear()
-	for l in dic_fqc:
-		ec1_tle = dic_fqc[l]["tle"]
-		tracker = sattracker3.Tracker(satellite=ec1_tle, groundstation=tallinn)
-		tracker.set_epoch(time.time())
-		elev = tracker.elevation()
-		rang = tracker.range()
-		if elev >=1:
-			SatNearList.append([l,elev,rang])
-	#		SatellNear.append(str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
 	for d in range(SatNear.size()):
-		SatNear.delete('end')
-	for l in SatNearList:
-		SatNear.insert('end',str(l[0]).ljust(40)[:40] + "  " + str(int(l[1])).ljust(4)[:4] + "   " + str(int(l[2]/1000)).ljust(10)[:10])
+		sat = SatNear.get(d)[:40].strip()
+		if sat:trackers = calctracker(sat)
+		ele = trackers.elevation()
+		if int(ele) < 1 :
+			SatNear.delete(d)
+			SatNearList.remove(sat)
+			break
+	for l in dic_fqc:
+		trackers = calctracker(l)
+		elev = trackers.elevation()
+		rang = trackers.range()
+		if (elev >=1):
+			if not (l in  SatNearList):
+				SatNearList.append(l)
+				SatNear.insert('end',str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+			else:
+				for d in range(SatNear.size()):
+					sat = SatNear.get(d)[:40].strip()
+					if sat ==l:
+						SatNear.delete(d)
+						SatNear.insert(d,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
 	root.after(1000, SearchNear)
 
 root = Tk()
@@ -260,24 +294,27 @@ stop = Button(root, text="Stop", command=stop_scn)
 stop.grid(column=6, row=3)
 
 #get parameter and control frequency receiver
+SatLabel = Label(root, text="Satellite         :",font=("Arial Bold", 16))
+SatLabel.grid(row=6, columnspan=7,sticky=W)
 Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 16))
-Azimut.grid(row=6, columnspan=7,sticky=W)
+Azimut.grid(row=7, columnspan=7,sticky=W)
 Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 16))
-Elevation.grid(row=7, columnspan=7,sticky=W)
+Elevation.grid(row=8, columnspan=7,sticky=W)
 Range = Label(root, text="Range             :",font=("Arial Bold", 16))
-Range.grid(row=8, columnspan=7,sticky=W)
+Range.grid(row=9, columnspan=7,sticky=W)
 FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 16))
-FreqDownload.grid(row=9, columnspan=7,sticky=W)
+FreqDownload.grid(row=10, columnspan=7,sticky=W)
 FreqUpload = Label(root, text="Frequency Upload  :",font=("Arial Bold", 16))
-FreqUpload.grid(row=10, columnspan=7,sticky=W)
+FreqUpload.grid(row=11, columnspan=7,sticky=W)
 Mode = Label(root, text="Mode              :",font=("Arial Bold", 16))
-Mode.grid(row=11, columnspan=7,sticky=W)
+Mode.grid(row=12, columnspan=7,sticky=W)
 
 SatNear = Listbox(root, height=15, width=60,font=("TkFixedFont", 16))
-SatNear.grid(row=12, columnspan=7,sticky=W)
+SatNear.bind('<<ListboxSelect>>', SatNearSelected)
+SatNear.grid(row=13, columnspan=7,sticky=W)
 
 quit = Button(root, text="Quit", command = root.destroy)
-quit.grid(column=6, row=13)
+quit.grid(column=6, row=14)
 
 root.after(2000, SearchNear)
 root.after(5000, Control_freq)
