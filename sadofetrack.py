@@ -25,16 +25,16 @@ def calctracker(sat):
 	return(tkl)
 
 def get_satellite(SatAct):
+	global tracker
+	global Dfrequency
+	global Ufrequency
+	global Bfrequency
 	tracker = calctracker(SatAct)
 	tracker.set_epoch(time.time())
-	Dfrequencys = re.split('[\*\-/]',dic_fqc[SatAct]["Downlink"])
-	Dfrequencys[:] = [item for item in Dfrequencys if item != '']
-	Dfrequency['values'] = Dfrequencys
-	if Dfrequencys:Dfrequency.current(0)
-	Ufrequencys = re.split('[\*\-/]',dic_fqc[SatAct]["Uplink"])
-	Ufrequencys[:] = [item for item in Ufrequencys if item != '']
-	Ufrequency['values'] = Ufrequencys
-	if Ufrequencys:Ufrequency.current(0)
+	Dfrequency = dic_fqc[SatAct]["Downlink"].strip()
+	Ufrequency = dic_fqc[SatAct]["Uplink"].strip()
+	Bfrequency = dic_fqc[SatAct]["Beacon"].strip()
+
 
 
 def SatNearSelected(event):
@@ -75,6 +75,10 @@ def stop_scn():
 	start_es = False
 
 def Control_freq():
+	ModeD_rx ='FM'
+	ModeB_rx ='FM'
+	ModeU_tx ='FM'
+	ValidModes = ['USB', 'LSB', 'CW', 'CWR', 'RTTY', 'RTTYR', 'AM', 'FM', 'WFM', 'AMS', 'PKTLSB', 'PKTUSB', 'PKTFM', 'ECSSUSB', 'ECSSLSB', 'FAX', 'SAM', 'SAL', 'SAH', 'DSB']
 	if SatelliteAct !="":
 		tracker = calctracker(SatelliteAct)
 		Sa = "Satellite         :" + SatelliteAct
@@ -85,32 +89,56 @@ def Control_freq():
 		Elevation.configure(text=El)
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
-		if Dfrequency.get():
-			try:Df0  =float(Dfrequency.get())*1000000
-			except: Df0 = 0
-			Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
-			FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
-			FreqDownload.configure(text=FD)
-		else:Dfrec =0
-		if Ufrequency.get():
-			try: Uf0  =float(Ufrequency.get())*1000000
-			except:Uf0  = 0
-			Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
-			FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
-			FreqUpload.configure(text=FU)
-		else:Ufrec =0
-		Mode_tx = dic_fqc[SatelliteAct]["Mode"]
-		Mo = "Mode              :" + Mode_tx
-		Mode. configure(text=Mo)
-		rxcmd=""
+		try:Df0  =float(Dfrequency)*1000
+		except: Df0 = 0
+		Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
+		FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
+		FreqDownload.configure(text=FD)
+
+		try: Uf0  =float(Ufrequency)*1000
+		except:Uf0  = 0
+		Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
+		FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
+		FreqUpload.configure(text=FU)
+
+		try: Bf0  =float(Bfrequency)*1000
+		except:Bf0  = 0
+		Bfrec = tracker.doppler(100e6)*Bf0 /100000000+Bf0
+		BF="Beacon            :"+str(int(Bfrec)) + " Hz"
+		BeaconL.configure(text=BF)
+
+		Mo = dic_fqc[SatelliteAct]["ModeD"].strip()
+		if Mo in ValidModes:
+			ModeD_rx = Mo
+			MoD = "Mode:" + ModeD_rx
+			ModeD.configure(text=MoD)
+
+		Mo = dic_fqc[SatelliteAct]["ModeU"].strip()
+		if Mo in ValidModes:
+			ModeU_tx = Mo
+			MoU = "Mode:" + ModeU_tx
+			ModeU.configure(text=MoU)
+
+		Mo = dic_fqc[SatelliteAct]["ModeB"].strip()
+		if Mo in ValidModes:
+			ModeB_rx=Mo
+			MoB = "Mode:" + ModeB_rx
+			ModeB.configure(text=MoB)
+
+		rxcmd = ""
 		txcmd = ""
 		if start_es:
 			if checkDF.get():
-				rxcmd=" V VFOA F " + str(int(Dfrec))
+				if checkDF.get()==0:
+					rxcmd=""
+				if checkDF.get()==1:
+					rxcmd=" V VFOA F " + str(int(Dfrec)) + " M " + ModeD_rx
+				if checkDF.get()==2:
+					rxcmd=" V VFOA F " + str(int(Bfrec)) + " M " + ModeB_rx
 			if checkUF.get():
-				txcmd = " VFOB I " + str(int(Ufrec))
-			if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd + " M " + "FM" + " " + "8000"
-			else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd + " M " + "FM" + " " + "8000"
+				txcmd = " VFOB I " + str(int(Ufrec)) + " M " + ModeU_tx
+			if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
+			else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd 
 			print(cmd)
 			status,output = subprocess.getstatusoutput(cmd)
 	root.after(5000, Control_freq)
@@ -129,13 +157,15 @@ def InsertSat():
 def SearchNear():
 	global SatNearList
 	SS = SatNear.curselection()
+
 	for d in range(SatNear.size()):
-		SCS = SatNear.curselection()
+
 		l = SatNear.get(d)[:40].strip()
 		tkl = calctracker(l)
 		elev = tkl.elevation()
 		rang = tkl.range()
 		SatNear.delete(d)
+
 		if (elev >=1):
 			if l in SatNearList:
 				SatNear.insert(d,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
@@ -144,16 +174,20 @@ def SearchNear():
 				SatNear.insert(0,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
 				SatNear.itemconfig(0, {'bg':'yellow'})
 				SatNearList.append(l)
+
 		else:
 			if l in SatNearList:
 				SatNear.insert('end',str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
 				SatNear.itemconfig('end', {'bg':'white'})
 				SatNearList.remove(l)
+
 			else:
 				SatNear.insert(d,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
 				SatNear.itemconfig(d, {'bg':'white'})
 		if SS:
-			if SS[0]==d:SatNear.selection_set(SS[0])
+			if SS[0]==d:
+				SatNear.selection_set(SS[0])
+
 	root.after(1000, SearchNear)
 
 
@@ -161,7 +195,7 @@ def SearchNear():
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
-root.geometry('600x700')
+root.geometry('600x750')
 
 #get configuration file
 if pathlib.Path('config.pkl').is_file():
@@ -222,7 +256,7 @@ Separator(root).place(x=0, y=47, relwidth=1)
 
 #get satellite
 
-sat_list = list()
+#sat_list = list()
 list_tle = list()
 dic_tle = {}
 list_fqc = list()
@@ -239,44 +273,46 @@ for itn in range(0,len(list_tle),3):
 	nserie=list_tle[itn+1].split()[1]
 	item_tle = {"name": list_tle[itn].rstrip(),"tle1":list_tle[itn+1], "tle2":list_tle[itn+2]}
 	dic_tle[nserie.rstrip()] = item_tle
+if pathlib.Path('frequency.pkl').is_file():
+	with open('frequency.pkl','rb') as f:  # Python 3: open(..., 'rb')
+	    fqc = pickle.load(f)
 
-file = urllib.request.urlopen("http://www.ne.jp/asahi/hamradio/je9pel/satslist.csv")
-for line in file:
-	l1=line.decode('utf-8').rstrip('\n\r').split(";")
-	list_fqc.append(l1)
+#else:
+#	file = urllib.request.urlopen("http://www.ne.jp/asahi/hamradio/je9pel/satslist.csv")
+
+list_fqc=fqc[0]
 nr = 0
 for itn in range(0,len(list_fqc)):
-	if (list_fqc[itn][7] == "active") and (list_fqc[itn][1]+"U" in dic_tle.keys()):
-		item_fqc = {"satellite": list_fqc[itn][0].rstrip(),
-		"Number":list_fqc[itn][1],
+	if  str(list_fqc[itn][0])+"U" in dic_tle.keys():
+		item_fqc = {"satellite": list_fqc[itn][1],
+		"Number":list_fqc[itn][0],
 		"Uplink":list_fqc[itn][2],
 		"Downlink":list_fqc[itn][3],
 		"Beacon":list_fqc[itn][4],
-		"Mode":list_fqc[itn][5],
-		"Callsign":list_fqc[itn][6],
-		"tle": dic_tle[list_fqc[itn][1]+"U"]}
-		if list_fqc[itn][0] in dic_fqc.keys():
+		"ModeD":list_fqc[itn][5],
+		"ModeU":list_fqc[itn][6],
+		"ModeB":list_fqc[itn][7],
+#		"Callsign":list_fqc[itn][11],
+		"tle": dic_tle[str(list_fqc[itn][0])+"U"]}
+		if list_fqc[itn][1] in dic_fqc.keys():
 			nr=nr+1
-			dic_fqc[list_fqc[itn][0]+str(nr)] = item_fqc
+			dic_fqc[str(list_fqc[itn][1])+str(nr)] = item_fqc
 		else:
-			dic_fqc[list_fqc[itn][0]] = item_fqc
+			dic_fqc[str(list_fqc[itn][1])] = item_fqc
 			nr=0
-for l in dic_fqc.keys(): sat_list.append(l)
+
+#for l in dic_fqc.keys(): sat_list.append(l)
 checkDF= IntVar()
 checkUF= IntVar()
-checDF = Checkbutton(root, text="Track Downlad Freq.",variable=checkDF, onvalue=1, offvalue=0)
+
+checDF = Radiobutton(root, text="Not Track Downlad Freq.",variable=checkDF, value=0)
 checDF.grid(column=0, row=2,columnspan=2,sticky=W)
+checDF = Radiobutton(root, text="TTrack Downlad Freq.",variable=checkDF, value=1)
+checDF.grid(column=0, row=3,columnspan=2,sticky=W)
+checDF = Radiobutton(root, text="Track Beacon Freq.",variable=checkDF, value=2)
+checDF.grid(column=0, row=4,columnspan=2,sticky=W)
 checUF = Checkbutton(root, text="Track Upload Freq.",variable=checkUF, onvalue=1, offvalue=0)
 checUF.grid(column=3, row=2,columnspan=2,sticky=W)
-#get frequency
-lab_frequencyD = Label(root, text="Downlad Frequency:")
-lab_frequencyD.grid(column=0, row=3,columnspan=1,)
-Dfrequency  = Combobox(root)
-Dfrequency.grid(column=1, row=3,columnspan=2)
-lab_frequencyU = Label(root, text="Upload Frequency:")
-lab_frequencyU.grid(column=3, row=3,columnspan=1)
-Ufrequency  = Combobox(root)
-Ufrequency.grid(column=4, row=3,columnspan=2)
 
 #save configuration
 save = Button(root, text="Save", command=save_data)
@@ -301,20 +337,26 @@ Elevation.grid(row=8, columnspan=7,sticky=W)
 Range = Label(root, text="Range             :",font=("Arial Bold", 16))
 Range.grid(row=9, columnspan=7,sticky=W)
 FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 16))
-FreqDownload.grid(row=10, columnspan=7,sticky=W)
+FreqDownload.grid(row=10, columnspan=5,sticky=W)
 FreqUpload = Label(root, text="Frequency Upload  :",font=("Arial Bold", 16))
-FreqUpload.grid(row=11, columnspan=7,sticky=W)
-Mode = Label(root, text="Mode              :",font=("Arial Bold", 16))
-Mode.grid(row=12, columnspan=7,sticky=W)
-
+FreqUpload.grid(row=11, columnspan=5,sticky=W)
+BeaconL = Label(root, text="Beacon            :",font=("Arial Bold", 16))
+BeaconL.grid(row=12, columnspan=5,sticky=W)
+ModeD = Label(root, text="Mode:",font=("Arial Bold", 16))
+ModeD.grid(row=10, column=4, columnspan=4,sticky=W)
+ModeU = Label(root, text="Mode:",font=("Arial Bold", 16))
+ModeU.grid(row=11,column=4, columnspan=4,sticky=W)
+ModeB = Label(root, text="Mode:",font=("Arial Bold", 16))
+ModeB.grid(row=12,column=4, columnspan=4,sticky=W)
 SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16))
 SatNear.bind('<<ListboxSelect>>', SatNearSelected)
 SatNear.grid(row=13, columnspan=7,sticky=W)
+
 SatelliteAct = ""
 InsertSat()
 quit = Button(root, text="Quit", command = root.destroy)
 quit.grid(column=6, row=14)
 
 root.after(2000, SearchNear)
-root.after(5000, Control_freq)
+root.after(2000, Control_freq)
 root.mainloop()
