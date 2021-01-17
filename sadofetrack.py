@@ -112,17 +112,26 @@ def Control_freq():
 			ModeD_rx = Mo
 			MoD = "Mode:" + ModeD_rx
 			ModeD.configure(text=MoD)
+		else:
+			MoD = "Mode:" + ''
+			ModeD.configure(text=MoD)
 
 		Mo = dic_fqc[SatelliteAct]["ModeU"].strip()
 		if Mo in ValidModes:
 			ModeU_tx = Mo
 			MoU = "Mode:" + ModeU_tx
 			ModeU.configure(text=MoU)
+		else:
+			MoU = "Mode:" + ''
+			ModeU.configure(text=MoU)
 
 		Mo = dic_fqc[SatelliteAct]["ModeB"].strip()
 		if Mo in ValidModes:
 			ModeB_rx=Mo
 			MoB = "Mode:" + ModeB_rx
+			ModeB.configure(text=MoB)
+		else:
+			MoB = "Mode:" + ''
 			ModeB.configure(text=MoB)
 
 		rxcmd = ""
@@ -132,13 +141,17 @@ def Control_freq():
 				if checkDF.get()==0:
 					rxcmd=""
 				if checkDF.get()==1:
-					rxcmd=" V VFOA F " + str(int(Dfrec)) + " M " + ModeD_rx
+					rxcmd= "V VFOA  M " + ModeD_rx + " 0 F " + str(int(Dfrec))
+					print(rxcmd, ModeD_rx)
 				if checkDF.get()==2:
-					rxcmd=" V VFOA F " + str(int(Bfrec)) + " M " + ModeB_rx
+					rxcmd= "V VFOA M " + ModeB_rx + " 0 F " + str(int(Bfrec))
+				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
+				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd
+				status,output = subprocess.getstatusoutput(cmd)
 			if checkUF.get():
-				txcmd = " VFOB I " + str(int(Ufrec)) + " M " + ModeU_tx
-			if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
-			else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd 
+				txcmd ="V VFOB S 1 X " + ModeU_tx + " 0 I " + str(int(Ufrec))
+				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
+				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd
 			print(cmd)
 			status,output = subprocess.getstatusoutput(cmd)
 	root.after(5000, Control_freq)
@@ -289,8 +302,8 @@ for itn in range(0,len(list_fqc)):
 		"Uplink":list_fqc[itn][2],
 		"Downlink":list_fqc[itn][3],
 		"Beacon":list_fqc[itn][4],
-		"ModeD":list_fqc[itn][5],
-		"ModeU":list_fqc[itn][6],
+		"ModeD":list_fqc[itn][6],
+		"ModeU":list_fqc[itn][5],
 		"ModeB":list_fqc[itn][7],
 #		"Callsign":list_fqc[itn][11],
 		"tle": dic_tle[str(list_fqc[itn][0])+"U"]}
