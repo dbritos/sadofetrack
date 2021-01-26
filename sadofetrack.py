@@ -385,7 +385,7 @@ ModeB = Label(root, text="Mode:",font=("Arial Bold", 16))
 ModeB.grid(row=14,column=4, columnspan=4,sticky=W)
 Separator(root, orient='horizontal').grid(row=15,columnspan=9,sticky="ew")
 
-Label(root, text='Satellite Name    Elev Azimut      Satellite Explanation', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
+Label(root, text='Satellite Name    Elev Azimut       Satellite Description', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
 SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16))
 SatNear.bind('<<ListboxSelect>>', SatNearSelected)
 SatNear.grid(row=17, columnspan=7,sticky=W)
