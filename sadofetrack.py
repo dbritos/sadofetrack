@@ -20,9 +20,11 @@ def selectrig(event):
 
 def calctracker(sat):
 	tle = dic_fqc[sat]["tle"]
+
 	tkl = sattracker3.Tracker(satellite=tle, groundstation=tallinn)
 	tkl.set_epoch(time.time())
 	return(tkl)
+
 
 def get_satellite(SatAct):
 	global tracker
@@ -35,15 +37,13 @@ def get_satellite(SatAct):
 	Ufrequency = dic_fqc[SatAct]["Uplink"].strip()
 	Bfrequency = dic_fqc[SatAct]["Beacon"].strip()
 
-
-
 def SatNearSelected(event):
 	global SatelliteAct
 	selection =event.widget.curselection()
 	if selection:
 		index =  selection[0]
 		value = event.widget.get(index)
-		SatelliteAct = value[:40].strip()
+		SatelliteAct = value[:17].strip()
 		get_satellite(SatelliteAct)
 
 def save_data():
@@ -89,51 +89,61 @@ def Control_freq():
 		Elevation.configure(text=El)
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
+
 		try:Df0  =float(Dfrequency)*1000
 		except: Df0 = 0
-		Dfrec = tracker.doppler(100e6)*Df0 /100000000+Df0
-		FD="Frequency Download:"+str(int(Dfrec)) + " Hz"
+		frec = tracker.doppler(100e6)*Df0 /100000000+Df0
+		FD="Frequency Download:"+str(int(frec)) + " Hz"
 		FreqDownload.configure(text=FD)
+		if frec != 0:Dfrec = " F " + str(int(frec))
+		else:Dfrec = ""
 
 		try: Uf0  =float(Ufrequency)*1000
 		except:Uf0  = 0
-		Ufrec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
-		FU="Frequency Upload  :"+str(int(Ufrec)) + " Hz"
+		frec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
+		FU="Frequency Upload  :"+str(int(frec)) + " Hz"
 		FreqUpload.configure(text=FU)
+		if frec !=0:Ufrec = " I " + str(int(frec))
+		else:Ufrec = ""
 
 		try: Bf0  =float(Bfrequency)*1000
 		except:Bf0  = 0
-		Bfrec = tracker.doppler(100e6)*Bf0 /100000000+Bf0
-		BF="Beacon            :"+str(int(Bfrec)) + " Hz"
+		frec = tracker.doppler(100e6)*Bf0 /100000000+Bf0
+		BF="Beacon            :"+str(int(frec)) + " Hz"
 		BeaconL.configure(text=BF)
+		if frec!=0:Bfrec = " F " + str(int(frec))
+		else:Bfrec = ""
 
 		Mo = dic_fqc[SatelliteAct]["ModeD"].strip()
 		if Mo in ValidModes:
 			ModeD_rx = Mo
 			MoD = "Mode:" + ModeD_rx
+			ModeDcmd = " M " + ModeD_rx + " 0 "
 			ModeD.configure(text=MoD)
 		else:
 			MoD = "Mode:" + ''
 			ModeD.configure(text=MoD)
-
+			ModeDcmd = " "
 		Mo = dic_fqc[SatelliteAct]["ModeU"].strip()
 		if Mo in ValidModes:
 			ModeU_tx = Mo
 			MoU = "Mode:" + ModeU_tx
+			ModeUcmd = " X " + ModeU_tx + " 0 "
 			ModeU.configure(text=MoU)
 		else:
 			MoU = "Mode:" + ''
 			ModeU.configure(text=MoU)
-
+			ModeUcmd = " "
 		Mo = dic_fqc[SatelliteAct]["ModeB"].strip()
 		if Mo in ValidModes:
 			ModeB_rx=Mo
 			MoB = "Mode:" + ModeB_rx
+			ModeBcmd = " M " + ModeB_rx + " 0 "
 			ModeB.configure(text=MoB)
 		else:
 			MoB = "Mode:" + ''
 			ModeB.configure(text=MoB)
-
+			ModeBcmd = " "
 		rxcmd = ""
 		txcmd = ""
 		if start_es:
@@ -141,19 +151,19 @@ def Control_freq():
 				if checkDF.get()==0:
 					rxcmd=""
 				if checkDF.get()==1:
-					rxcmd= "V VFOA  M " + ModeD_rx + " 0 F " + str(int(Dfrec))
-					print(rxcmd, ModeD_rx)
+					rxcmd= " S 1 VFOB" + ModeDcmd + Dfrec
 				if checkDF.get()==2:
-					rxcmd= "V VFOA M " + ModeB_rx + " 0 F " + str(int(Bfrec))
-				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
-				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd
+					rxcmd= " S 1 VFOB" + ModeBcmd + Bfrec
+				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + rxcmd
+				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + rxcmd
 				status,output = subprocess.getstatusoutput(cmd)
+				print(cmd,"\n",status,output)
 			if checkUF.get():
-				txcmd ="V VFOB S 1 X " + ModeU_tx + " 0 I " + str(int(Ufrec))
-				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + " " + rxcmd + " " + txcmd
-				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + " " + rxcmd + " " + txcmd
-			print(cmd)
+				txcmd =" S 1 VFOB" + ModeUcmd + Ufrec
+				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + txcmd
+				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + txcmd
 			status,output = subprocess.getstatusoutput(cmd)
+			print(cmd,"\n",status,output)
 	root.after(5000, Control_freq)
 
 def InsertSat():
@@ -161,11 +171,13 @@ def InsertSat():
 		tkl = calctracker(l)
 		elev = tkl.elevation()
 		rang = tkl.range()
+		Title = dic_fqc[l]["Title"].strip()
+		sns=str(l).ljust(17)[:17] + " " + str(int(elev)).ljust(4)[:4] + " " + str(int(rang/1000)).ljust(10)[:10]+ "   " + Title.ljust(20)[:20]
 		if (elev >=1):
-			SatNear.insert(0,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+			SatNear.insert(0,sns)
 			SatNear.itemconfig(0, {'bg':'yellow'})
 		else:
-			SatNear.insert('end',str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+			SatNear.insert('end',sns)
 
 def SearchNear():
 	global SatNearList
@@ -173,34 +185,43 @@ def SearchNear():
 
 	for d in range(SatNear.size()):
 
-		l = SatNear.get(d)[:40].strip()
+		l = SatNear.get(d)[:17].strip()
+		Title = dic_fqc[l]["Title"].strip()
 		tkl = calctracker(l)
 		elev = tkl.elevation()
 		rang = tkl.range()
 		SatNear.delete(d)
-
+		sns=str(l).ljust(17)[:17] + " " + str(int(elev)).ljust(4)[:4] + " " + str(int(rang/1000)).ljust(10)[:10]+ "   " + Title.ljust(20)[:20]
 		if (elev >=1):
 			if l in SatNearList:
-				SatNear.insert(d,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+				SatNear.insert(d,sns)
 				SatNear.itemconfig(d, {'bg':'yellow'})
+				if SS:
+					if SS[0]==d:
+						SatNear.selection_set(d)
 			else:
-				SatNear.insert(0,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+				SatNear.insert(0,sns)
 				SatNear.itemconfig(0, {'bg':'yellow'})
 				SatNearList.append(l)
+				if SS:
+					if SS[0]==d:
+						SatNear.selection_set(0)
 
 		else:
 			if l in SatNearList:
-				SatNear.insert('end',str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+				SatNear.insert('end',sns)
 				SatNear.itemconfig('end', {'bg':'white'})
 				SatNearList.remove(l)
+				if SS:
+					if SS[0]==d:
+						SatNear.selection_set(SatNear.size()-1)
 
 			else:
-				SatNear.insert(d,str(l).ljust(40)[:40] + "  " + str(int(elev)).ljust(4)[:4] + "   " + str(int(rang/1000)).ljust(10)[:10])
+				SatNear.insert(d,sns)
 				SatNear.itemconfig(d, {'bg':'white'})
-		if SS:
-			if SS[0]==d:
-				SatNear.selection_set(SS[0])
-
+				if SS:
+					if SS[0]==d:
+						SatNear.selection_set(d)
 	root.after(1000, SearchNear)
 
 
@@ -274,13 +295,13 @@ list_tle = list()
 dic_tle = {}
 list_fqc = list()
 dic_fqc = {}
-file = urllib.request.urlopen("https://www.celestrak.com/NORAD/elements/stations.txt")
+file = urllib.request.urlopen("http://www.celestrak.com/NORAD/elements/active.txt")
 for line in file:
 	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
 
-file = urllib.request.urlopen("https://www.amsat.org/tle/current/nasabare.txt")
-for line in file:
-	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
+#file = urllib.request.urlopen("https://www.amsat.org/tle/current/nasabare.txt")
+#for line in file:
+#	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
 
 for itn in range(0,len(list_tle),3):
 	nserie=list_tle[itn+1].split()[1]
@@ -305,6 +326,7 @@ for itn in range(0,len(list_fqc)):
 		"ModeD":list_fqc[itn][6],
 		"ModeU":list_fqc[itn][5],
 		"ModeB":list_fqc[itn][7],
+		"Title":list_fqc[itn][11],
 #		"Callsign":list_fqc[itn][11],
 		"tle": dic_tle[str(list_fqc[itn][0])+"U"]}
 		if list_fqc[itn][1] in dic_fqc.keys():
@@ -339,36 +361,39 @@ start.grid(column=6, row=2)
 #stop tracking
 stop = Button(root, text="Stop", command=stop_scn)
 stop.grid(column=6, row=3)
-
+Separator(root, orient='horizontal').grid(row=7,columnspan=9,sticky="ew")
 #get parameter and control frequency receiver
 SatLabel = Label(root, text="Satellite         :",font=("Arial Bold", 16))
-SatLabel.grid(row=6, columnspan=7,sticky=W)
+SatLabel.grid(row=8, columnspan=7,sticky=W)
 Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 16))
-Azimut.grid(row=7, columnspan=7,sticky=W)
+Azimut.grid(row=9, columnspan=7,sticky=W)
 Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 16))
-Elevation.grid(row=8, columnspan=7,sticky=W)
+Elevation.grid(row=10, columnspan=7,sticky=W)
 Range = Label(root, text="Range             :",font=("Arial Bold", 16))
-Range.grid(row=9, columnspan=7,sticky=W)
+Range.grid(row=11, columnspan=7,sticky=W)
 FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 16))
-FreqDownload.grid(row=10, columnspan=5,sticky=W)
+FreqDownload.grid(row=12, columnspan=5,sticky=W)
 FreqUpload = Label(root, text="Frequency Upload  :",font=("Arial Bold", 16))
-FreqUpload.grid(row=11, columnspan=5,sticky=W)
+FreqUpload.grid(row=13, columnspan=5,sticky=W)
 BeaconL = Label(root, text="Beacon            :",font=("Arial Bold", 16))
-BeaconL.grid(row=12, columnspan=5,sticky=W)
+BeaconL.grid(row=14, columnspan=5,sticky=W)
 ModeD = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeD.grid(row=10, column=4, columnspan=4,sticky=W)
+ModeD.grid(row=12, column=4, columnspan=4,sticky=W)
 ModeU = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeU.grid(row=11,column=4, columnspan=4,sticky=W)
+ModeU.grid(row=13,column=4, columnspan=4,sticky=W)
 ModeB = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeB.grid(row=12,column=4, columnspan=4,sticky=W)
+ModeB.grid(row=14,column=4, columnspan=4,sticky=W)
+Separator(root, orient='horizontal').grid(row=15,columnspan=9,sticky="ew")
+
+Label(root, text='Satellite Name    Elev Azimut      Satellite Explanation', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
 SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16))
 SatNear.bind('<<ListboxSelect>>', SatNearSelected)
-SatNear.grid(row=13, columnspan=7,sticky=W)
+SatNear.grid(row=17, columnspan=7,sticky=W)
 
 SatelliteAct = ""
 InsertSat()
 quit = Button(root, text="Quit", command = root.destroy)
-quit.grid(column=6, row=14)
+quit.grid(column=6, row=18)
 
 root.after(2000, SearchNear)
 root.after(2000, Control_freq)
