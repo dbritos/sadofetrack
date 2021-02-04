@@ -45,6 +45,14 @@ def SatNearSelected(event):
 		value = event.widget.get(index)
 		SatelliteAct = value[:17].strip()
 		get_satellite(SatelliteAct)
+		a = get_freq_mode()
+
+def rigcmd(rig_num,serial_port_selected,rxcmd):
+	if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + rxcmd
+	else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + rxcmd
+	status,output = subprocess.getstatusoutput(cmd)
+	print(cmd,"\n",status,output)
+	return(status,output)
 
 def save_data():
 	global tallinn
@@ -74,10 +82,7 @@ def stop_scn():
 	global start_es
 	start_es = False
 
-def Control_freq():
-	ModeD_rx ='FM'
-	ModeB_rx ='FM'
-	ModeU_tx ='FM'
+def get_freq_mode():
 	ValidModes = ['USB', 'LSB', 'CW', 'CWR', 'RTTY', 'RTTYR', 'AM', 'FM', 'WFM', 'AMS', 'PKTLSB', 'PKTUSB', 'PKTFM', 'ECSSUSB', 'ECSSLSB', 'FAX', 'SAM', 'SAL', 'SAH', 'DSB']
 	if SatelliteAct !="":
 		tracker = calctracker(SatelliteAct)
@@ -90,7 +95,7 @@ def Control_freq():
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
 
-		try:Df0  =float(Dfrequency)*1000
+		try:Df0  = float(Dfrequency)*1000
 		except: Df0 = 0
 		frec = tracker.doppler(100e6)*Df0 /100000000+Df0
 		FD="Frequency Download:"+str(int(frec)) + " Hz"
@@ -98,7 +103,7 @@ def Control_freq():
 		if frec != 0:Dfrec = " F " + str(int(frec))
 		else:Dfrec = ""
 
-		try: Uf0  =float(Ufrequency)*1000
+		try: Uf0  = float(Ufrequency)*1000
 		except:Uf0  = 0
 		frec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
 		FU="Frequency Upload  :"+str(int(frec)) + " Hz"
@@ -113,57 +118,50 @@ def Control_freq():
 		BeaconL.configure(text=BF)
 		if frec!=0:Bfrec = " F " + str(int(frec))
 		else:Bfrec = ""
+		R_freq = [Dfrec,Ufrec,Bfrec]
 
-		Mo = dic_fqc[SatelliteAct]["ModeD"].strip()
-		if Mo in ValidModes:
-			ModeD_rx = Mo
-			MoD = "Mode:" + ModeD_rx
+		ModeD_rx = dic_fqc[SatelliteAct]["ModeD"].strip()
+		if ModeD_rx in ValidModes:
 			ModeDcmd = " M " + ModeD_rx + " 0 "
-			ModeD.configure(text=MoD)
 		else:
-			MoD = "Mode:" + ''
-			ModeD.configure(text=MoD)
+#			ModeD_rx = ' '
 			ModeDcmd = " "
-		Mo = dic_fqc[SatelliteAct]["ModeU"].strip()
-		if Mo in ValidModes:
-			ModeU_tx = Mo
-			MoU = "Mode:" + ModeU_tx
+		ModeD.configure(text="Mode:" + ModeD_rx)
+
+		ModeU_tx = dic_fqc[SatelliteAct]["ModeU"].strip()
+		if ModeU_tx in ValidModes:
 			ModeUcmd = " X " + ModeU_tx + " 0 "
-			ModeU.configure(text=MoU)
 		else:
-			MoU = "Mode:" + ''
-			ModeU.configure(text=MoU)
+#			ModeU_tx = ' '
 			ModeUcmd = " "
-		Mo = dic_fqc[SatelliteAct]["ModeB"].strip()
-		if Mo in ValidModes:
-			ModeB_rx=Mo
-			MoB = "Mode:" + ModeB_rx
+		ModeU.configure(text="Mode:" + ModeU_tx)
+
+		ModeB_rx = dic_fqc[SatelliteAct]["ModeB"].strip()
+		if ModeB_rx in ValidModes:
 			ModeBcmd = " M " + ModeB_rx + " 0 "
-			ModeB.configure(text=MoB)
 		else:
-			MoB = "Mode:" + ''
-			ModeB.configure(text=MoB)
+#			ModeB_rx = ' '
 			ModeBcmd = " "
+		ModeB.configure(text="Mode:" + ModeB_rx)
+		R_mode = [ModeDcmd,ModeUcmd,ModeBcmd]
+		rfm=[R_freq,R_mode]
+		return(rfm)
+
+def Control_freq():
+	if SatelliteAct !="":
+		Rfreq,Rmode = get_freq_mode()
+		ModeDcmd,ModeUcmd,ModeBcmd = Rmode
+		Dfrec,Ufrec,Bfrec = Rfreq
 		rxcmd = ""
+		rxmodlist = ['',' S 1 VFOA' + ModeDcmd + Dfrec," S 1 VFOB" + ModeBcmd + Bfrec]
 		txcmd = ""
 		if start_es:
 			if checkDF.get():
-				if checkDF.get()==0:
-					rxcmd=""
-				if checkDF.get()==1:
-					rxcmd= " S 1 VFOB" + ModeDcmd + Dfrec
-				if checkDF.get()==2:
-					rxcmd= " S 1 VFOB" + ModeBcmd + Bfrec
-				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + rxcmd
-				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + rxcmd
-				status,output = subprocess.getstatusoutput(cmd)
-				print(cmd,"\n",status,output)
+				rxcmd = rxmodlist[checkDF.get()]
+				status,output = rigcmd(rig_num,serial_port_selected,rxcmd)
 			if checkUF.get():
 				txcmd =" S 1 VFOB" + ModeUcmd + Ufrec
-				if str(rig_num) == "4":	cmd = "rigctl -m " + str(rig_num) + txcmd
-				else: cmd = "rigctl -m " + str(rig_num) +" -r " + serial_port_selected + txcmd
-			status,output = subprocess.getstatusoutput(cmd)
-			print(cmd,"\n",status,output)
+				status,output = rigcmd(rig_num,serial_port_selected,txcmd)
 	root.after(5000, Control_freq)
 
 def InsertSat():
@@ -214,7 +212,7 @@ def SearchNear():
 				SatNearList.remove(l)
 				if SS:
 					if SS[0]==d:
-						SatNear.selection_set(SatNear.size()-1)
+						SatNear.selection_set('end')
 
 			else:
 				SatNear.insert(d,sns)
@@ -222,6 +220,7 @@ def SearchNear():
 				if SS:
 					if SS[0]==d:
 						SatNear.selection_set(d)
+
 	root.after(1000, SearchNear)
 
 
@@ -385,8 +384,8 @@ ModeB = Label(root, text="Mode:",font=("Arial Bold", 16))
 ModeB.grid(row=14,column=4, columnspan=4,sticky=W)
 Separator(root, orient='horizontal').grid(row=15,columnspan=9,sticky="ew")
 
-Label(root, text='Satellite Name    Elev Azimut       Satellite Description', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
-SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16))
+Label(root, text='Satellite Name    Elev Range        Satellite Description', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
+SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16),selectbackground='lightgreen')
 SatNear.bind('<<ListboxSelect>>', SatNearSelected)
 SatNear.grid(row=17, columnspan=7,sticky=W)
 
