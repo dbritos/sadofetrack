@@ -2,6 +2,7 @@
 import subprocess
 import pathlib
 import time
+import serial
 from tkinter import *
 from tkinter.ttk import *
 import urllib.request
@@ -11,6 +12,10 @@ import pickle
 def select_serial_port(event):
 	global serial_port_selected
 	serial_port_selected=event.widget.get()
+
+def select_serial_portAE(event):
+	global serial_portAE_selected
+	serial_portAE_selected=event.widget.get()
 
 def selectrig(event):
 	global rig_selected
@@ -44,7 +49,6 @@ def SatNearSelected(event):
 		index =  selection[0]
 		value = event.widget.get(index)
 		SatelliteAct = value[:17].strip()
-		get_satellite(SatelliteAct)
 		a = get_freq_mode()
 
 def rigcmd(rig_num,serial_port_selected,rxcmd):
@@ -72,7 +76,7 @@ def save_data():
 	except:	lon = lon_entry.get()
 	tallinn = (lat,lon, "500")
 	with open('config.pkl', 'wb') as f:
-	    pickle.dump([serial_port_selected,rig_selected,rig_num,tallinn], f)
+	    pickle.dump([serial_port_selected,rig_selected,rig_num,serial_portAE_selected,tallinn], f)
 
 def start_scn():
 	global start_es
@@ -81,16 +85,22 @@ def start_scn():
 def stop_scn():
 	global start_es
 	start_es = False
+def output_tracker(A,Z):
+	output = "W " + A + " " + Z
+	ser.write(output)
 
 def get_freq_mode():
 	ValidModes = ['USB', 'LSB', 'CW', 'CWR', 'RTTY', 'RTTYR', 'AM', 'FM', 'WFM', 'AMS', 'PKTLSB', 'PKTUSB', 'PKTFM', 'ECSSUSB', 'ECSSLSB', 'FAX', 'SAM', 'SAL', 'SAH', 'DSB']
 	if SatelliteAct !="":
+		get_satellite(SatelliteAct)
 		tracker = calctracker(SatelliteAct)
 		Sa = "Satellite         :" + SatelliteAct
 		SatLabel.configure(text=Sa)
-		Az = "Azimut            :"+str(int(tracker.azimuth()))
+		Azim ="{:03.0f}".format(tracker.azimuth())
+		Az = "Azimut            :" + Azim + " º"
 		Azimut.configure(text=Az)
-		El = "Elevation         :"+str(int(tracker.elevation()))
+		Eleva = "{:03.0f}".format(tracker.elevation())
+		El = "Elevation         :" + Eleva + " º"
 		Elevation.configure(text=El)
 		Ra = "Range             :"+str(int((tracker.range()/1000)))+" Km"
 		Range.configure(text=Ra)
@@ -153,14 +163,14 @@ def Control_freq():
 		ModeDcmd,ModeUcmd,ModeBcmd = Rmode
 		Dfrec,Ufrec,Bfrec = Rfreq
 		rxcmd = ""
-		rxmodlist = ['',' S 1 VFOA' + ModeDcmd + Dfrec," S 1 VFOB" + ModeBcmd + Bfrec]
+		rxmodlist = ['',' S 1 VFOA' + ModeDcmd + Dfrec," S 1 VFOA"  + Bfrec]
 		txcmd = ""
 		if start_es:
 			if checkDF.get():
 				rxcmd = rxmodlist[checkDF.get()]
 				status,output = rigcmd(rig_num,serial_port_selected,rxcmd)
 			if checkUF.get():
-				txcmd =" S 1 VFOB" + ModeUcmd + Ufrec
+				txcmd =" S 1 VFOB"  + Ufrec
 				status,output = rigcmd(rig_num,serial_port_selected,txcmd)
 	root.after(5000, Control_freq)
 
@@ -228,29 +238,32 @@ def SearchNear():
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
-root.geometry('600x750')
+root.geometry('600x765')
 
 #get configuration file
 if pathlib.Path('config.pkl').is_file():
 	with open('config.pkl','rb') as f:  # Python 3: open(..., 'rb')
-	    serial_port_selected,rig_selected,rig_num,tallinn = pickle.load(f)
+	    serial_port_selected,rig_selected,rig_num,serial_portAE_selected,tallinn = pickle.load(f)
 else:
+	serial_portAE_selected=""
 	serial_port_selected=""
 	rig_selected="FLRig"
+	serial_portAE_selected=""
 	rig_num=4
 	tallinn = (-31.319493,-64.273951, "500")
 SatNearList = list()
+#open serial port for Azimut and Elevation Control
+ser = serial.Serial(serial_portAE_selected, 38400, timeout=0, parity=serial.PARITY_EVEN, rtscts=1)
 #get serial port
-lab_serial = Label(root, text="Serial Port:")
+lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
 serial_port = Combobox(root)
 status,output = subprocess.getstatusoutput("ls /dev/tty*")
 serial_port_list =output.split('\n')
 serial_port['values']= serial_port_list
-serial_port.current(1) #set the selected item
+serial_port.current(serial_port_list.index(serial_port_selected))
 serial_port.grid(column=1, row=0,sticky=W,  columnspan=2)
 serial_port.bind("<<ComboboxSelected>>", select_serial_port)
-#serial_port.current(serial_port_list.index(serial_port_selected))
 
 #get rig
 lab_rig = Label(root, text="Transceiver:")
@@ -273,19 +286,29 @@ rig.current(rig_list.index(rig_selected)) #set the selected item
 rig.grid(column=4, row=0,columnspan=2)
 rig.bind("<<ComboboxSelected>>", selectrig)
 
+# Select serial for AE tracker
+lab_serialAE = Label(root, text="Serial Port A E Tracker:")
+lab_serialAE.grid(row=1, column=0,sticky=W,columnspan=1)
+serial_portAE = Combobox(root)
+status,output = subprocess.getstatusoutput("ls /dev/tty*")
+serial_port_list =output.split('\n')
+serial_portAE['values']= serial_port_list
+serial_portAE.current(serial_port_list.index(serial_portAE_selected))
+serial_portAE.grid(column=1, row=1,sticky=W,  columnspan=2)
+serial_portAE.bind("<<ComboboxSelected>>", select_serial_portAE)
 #get local coordinates
 lat_lb = Label(root, text="Latitude:")
-lat_lb.grid(row=1, column=0,sticky=W,columnspan=1)
+lat_lb.grid(row=2, column=0,sticky=W,columnspan=1)
 lat_entry= Entry(root)
 lat_entry.insert(0, str(tallinn[0]))
-lat_entry.grid(row=1, column=1,sticky=W,columnspan=2)
+lat_entry.grid(row=2, column=1,sticky=W,columnspan=2)
 lon_lb = Label(root, text="Longitude:")
-lon_lb.grid(row=1, column=3,sticky=W,columnspan=1)
+lon_lb.grid(row=2, column=3,sticky=W,columnspan=1)
 lon_entry= Entry(root)
 lon_entry.insert(0, str(tallinn[1]))
-lon_entry.grid(row=1, column=4,sticky=W,columnspan=2)
+lon_entry.grid(row=2, column=4,sticky=W,columnspan=2)
+Separator(root, orient='horizontal').grid(row=3,columnspan=9,sticky="ew")
 
-Separator(root).place(x=0, y=47, relwidth=1)
 
 #get satellite
 
@@ -340,13 +363,13 @@ checkDF= IntVar()
 checkUF= IntVar()
 
 checDF = Radiobutton(root, text="Not Track Downlad Freq.",variable=checkDF, value=0)
-checDF.grid(column=0, row=2,columnspan=2,sticky=W)
-checDF = Radiobutton(root, text="TTrack Downlad Freq.",variable=checkDF, value=1)
-checDF.grid(column=0, row=3,columnspan=2,sticky=W)
-checDF = Radiobutton(root, text="Track Beacon Freq.",variable=checkDF, value=2)
 checDF.grid(column=0, row=4,columnspan=2,sticky=W)
+checDF = Radiobutton(root, text="TTrack Downlad Freq.",variable=checkDF, value=1)
+checDF.grid(column=0, row=5,columnspan=2,sticky=W)
+checDF = Radiobutton(root, text="Track Beacon Freq.",variable=checkDF, value=2)
+checDF.grid(column=0, row=6,columnspan=2,sticky=W)
 checUF = Checkbutton(root, text="Track Upload Freq.",variable=checkUF, onvalue=1, offvalue=0)
-checUF.grid(column=3, row=2,columnspan=2,sticky=W)
+checUF.grid(column=3, row=4,columnspan=2,sticky=W)
 
 #save configuration
 save = Button(root, text="Save", command=save_data)
@@ -355,44 +378,44 @@ start_es = False
 
 #start tracking
 start = Button(root, text="Start", command=start_scn)
-start.grid(column=6, row=2)
+start.grid(column=6, row=4)
 
 #stop tracking
 stop = Button(root, text="Stop", command=stop_scn)
-stop.grid(column=6, row=3)
-Separator(root, orient='horizontal').grid(row=7,columnspan=9,sticky="ew")
+stop.grid(column=6, row=5)
+Separator(root, orient='horizontal').grid(row=9,columnspan=9,sticky="ew")
 #get parameter and control frequency receiver
 SatLabel = Label(root, text="Satellite         :",font=("Arial Bold", 16))
-SatLabel.grid(row=8, columnspan=7,sticky=W)
+SatLabel.grid(row=10, columnspan=7,sticky=W)
 Azimut = Label(root, text="Azimut            :",font=("Arial Bold", 16))
-Azimut.grid(row=9, columnspan=7,sticky=W)
+Azimut.grid(row=11, columnspan=7,sticky=W)
 Elevation = Label(root, text="Elevation         :",font=("Arial Bold", 16))
-Elevation.grid(row=10, columnspan=7,sticky=W)
+Elevation.grid(row=12, columnspan=7,sticky=W)
 Range = Label(root, text="Range             :",font=("Arial Bold", 16))
-Range.grid(row=11, columnspan=7,sticky=W)
+Range.grid(row=13, columnspan=7,sticky=W)
 FreqDownload = Label(root, text="Frequency Download:",font=("Arial Bold", 16))
-FreqDownload.grid(row=12, columnspan=5,sticky=W)
+FreqDownload.grid(row=14, columnspan=5,sticky=W)
 FreqUpload = Label(root, text="Frequency Upload  :",font=("Arial Bold", 16))
-FreqUpload.grid(row=13, columnspan=5,sticky=W)
+FreqUpload.grid(row=15, columnspan=5,sticky=W)
 BeaconL = Label(root, text="Beacon            :",font=("Arial Bold", 16))
-BeaconL.grid(row=14, columnspan=5,sticky=W)
+BeaconL.grid(row=16, columnspan=5,sticky=W)
 ModeD = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeD.grid(row=12, column=4, columnspan=4,sticky=W)
+ModeD.grid(row=14, column=4, columnspan=4,sticky=W)
 ModeU = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeU.grid(row=13,column=4, columnspan=4,sticky=W)
+ModeU.grid(row=15,column=4, columnspan=4,sticky=W)
 ModeB = Label(root, text="Mode:",font=("Arial Bold", 16))
-ModeB.grid(row=14,column=4, columnspan=4,sticky=W)
-Separator(root, orient='horizontal').grid(row=15,columnspan=9,sticky="ew")
+ModeB.grid(row=16,column=4, columnspan=4,sticky=W)
+Separator(root, orient='horizontal').grid(row=17,columnspan=9,sticky="ew")
 
-Label(root, text='Satellite Name    Elev Range        Satellite Description', font=("TkFixedFont", 16)).grid(row=16,column=0, columnspan=9,sticky=W)
+Label(root, text='Satellite Name    Elev Range        Satellite Description', font=("TkFixedFont", 16)).grid(row=18,column=0, columnspan=9,sticky=W)
 SatNear = Listbox(root, height=20, width=60,font=("TkFixedFont", 16),selectbackground='lightgreen')
 SatNear.bind('<<ListboxSelect>>', SatNearSelected)
-SatNear.grid(row=17, columnspan=7,sticky=W)
+SatNear.grid(row=19, columnspan=7,sticky=W)
 
 SatelliteAct = ""
 InsertSat()
 quit = Button(root, text="Quit", command = root.destroy)
-quit.grid(column=6, row=18)
+quit.grid(column=6, row=20)
 
 root.after(2000, SearchNear)
 root.after(2000, Control_freq)
