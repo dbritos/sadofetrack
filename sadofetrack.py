@@ -248,7 +248,6 @@ else:
 	serial_portAE_selected="/dev/tty"
 	serial_port_selected="/dev/tty"
 	rig_selected="FLRig"
-
 	rig_num=4
 	tallinn = (-31.319493,-64.273951, "500")
 SatNearList = list()
