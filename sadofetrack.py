@@ -12,10 +12,23 @@ import pickle
 def select_serial_port(event):
 	global serial_port_selected
 	serial_port_selected=event.widget.get()
+def change_serial_port():
+	status,output = subprocess.getstatusoutput("ls /dev/tty*")
+	serial_port_list =output.split('\n')
+	serial_port['values']= serial_port_list
+	if (serial_port_selected in serial_port['values']):
+		serial_port.current(serial_port_list.index(serial_port_selected))
 
 def select_serial_portAE(event):
 	global serial_portAE_selected
 	serial_portAE_selected=event.widget.get()
+
+def change_serial_portAE():
+	status,output = subprocess.getstatusoutput("ls /dev/tty*")
+	serial_port_list = output.split('\n')
+	serial_portAE['values']= serial_port_list
+	if (serial_portAE_selected in serial_portAE['values']):
+	 serial_portAE.current(serial_port_list.index(serial_portAE_selected))
 
 def selectrig(event):
 	global rig_selected
@@ -256,11 +269,7 @@ ser = serial.Serial(serial_portAE_selected, 38400, timeout=0, parity=serial.PARI
 #get serial port
 lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
-serial_port = Combobox(root)
-status,output = subprocess.getstatusoutput("ls /dev/tty*")
-serial_port_list =output.split('\n')
-serial_port['values']= serial_port_list
-serial_port.current(serial_port_list.index(serial_port_selected))
+serial_port = Combobox(root,values = ["/dev/tty0"],postcommand = change_serial_port)
 serial_port.grid(column=1, row=0,sticky=W,  columnspan=2)
 serial_port.bind("<<ComboboxSelected>>", select_serial_port)
 
@@ -288,11 +297,7 @@ rig.bind("<<ComboboxSelected>>", selectrig)
 # Select serial for AE tracker
 lab_serialAE = Label(root, text="Serial Port AE:")
 lab_serialAE.grid(row=1, column=0,sticky=W,columnspan=1)
-serial_portAE = Combobox(root)
-status,output = subprocess.getstatusoutput("ls /dev/tty*")
-serial_port_list =output.split('\n')
-serial_portAE['values']= serial_port_list
-serial_portAE.current(serial_port_list.index(serial_portAE_selected))
+serial_portAE = Combobox(root,values = ["/dev/tty0"],postcommand = change_serial_portAE)
 serial_portAE.grid(column=1, row=1,sticky=W,  columnspan=2)
 serial_portAE.bind("<<ComboboxSelected>>", select_serial_portAE)
 #get local coordinates
