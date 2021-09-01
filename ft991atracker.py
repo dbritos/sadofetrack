@@ -43,6 +43,8 @@ def SatNearSelected(event):
 
 def save_data():
 	global tallinn
+	global portx
+	global porty
 	try:
 		if (float(lat_entry.get()) >= -90) and (float(lat_entry.get())) <= 90:
 			lat = lat_entry.get()
@@ -58,32 +60,35 @@ def save_data():
 			lon_entry.insert(0, "ERROR")
 	except:	lon = lon_entry.get()
 	tallinn = (lat,lon, "500")
+	print(portx,porty,tallinn)
 	with open('ft911a.pkl', 'wb') as f:
-	    pickle.dump([portx,serial_portAE_selected,tallinn], f)
+	    pickle.dump([portx,porty,tallinn], f)
 
 def start_scn():
 	global ser
+	global portx
+	global porty
 	portx = selected.get()
 
 	if portx =='':
 		serial_port.configure(style="R.TMenubutton")
 	else:
-		
-		print(portx)
 		bps=38400
 		timex=5
-		ser=serial.Serial(portx,bps,timeout=timex)
-		result=ser.write("FA;" .encode("ascii"))
-		data = port.read(11)
-		if dat==11
-			global start_es
-			start_es = True
-			global Mode
-			Mode = True
-			serial_port.configure(style="LG.TMenubutton")
+		try: ser=serial.Serial(portx,bps,timeout=timex)
+		except:	serial_port.configure(style="R.TMenubutton")
 		else:
-			ser:ser.close()
-
+			result=ser.write("FA;" .encode("ascii"))
+			data = ser.read(11)
+			if len(data)==11:
+				global start_es
+				start_es = True
+				global Mode
+				Mode = True
+				serial_port.configure(style="LG.TMenubutton")
+			else:
+				if ser:ser.close()
+				serial_port.configure(style="R.TMenubutton")
 def stop_scn():
 	global start_es
 	start_es = False
@@ -252,11 +257,7 @@ def SearchNear():
 				if SS:
 					if SS[0]==d:
 						SatNear.selection_set(d)
-
 	root.after(1000, SearchNear)
-
-
-
 
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
@@ -267,12 +268,13 @@ stylegreen.configure("LG.TMenubutton", background="lightgreen")
 stylegred.configure("R.TMenubutton", background="red")
 stylegred.configure("W.TMenubutton", background="white")
 global portx
+global porty
 #get configuration file
 if pathlib.Path('ft911a.pkl').is_file():
 	with open('ft911a.pkl','rb') as f:  # Python 3: open(..., 'rb')
-	    portx,serial_portAE_selected,tallinn = pickle.load(f)
+	    portx,porty,tallinn = pickle.load(f)
 else:
-	serial_portAE_selected=""
+	porty=''
 	portx=''
 	tallinn = (-31.319493,-64.273951, "500")
 SatNearList = list()
@@ -286,7 +288,7 @@ options =glob.glob('/dev/tty[A-z]*')
 selected = StringVar(root)
 selected.set(options[0])
 serial_port = OptionMenu(root,selected,*options)
-serial_port.grid(column=1, row=0,sticky=W,  columnspan=2)
+serial_port.grid(column=1, row=0,sticky=W,  columnspan=3)
 serial_port.configure(style="W.TMenubutton")
 
 # Select serial for AE tracker
@@ -295,7 +297,7 @@ lab_serialAE.grid(row=1, column=0,sticky=W,columnspan=1)
 selectedAE = StringVar(root)
 selectedAE.set(options[0])
 serial_portAE = OptionMenu(root,selectedAE,*options)
-serial_portAE.grid(column=1, row=1,sticky=W,  columnspan=2)
+serial_portAE.grid(column=1, row=1,sticky=W,  columnspan=3)
 
 #get local coordinates
 lat_lb = Label(root, text="Latitude:")
@@ -321,10 +323,6 @@ dic_fqc = {}
 file = urllib.request.urlopen("http://www.celestrak.com/NORAD/elements/active.txt")
 for line in file:
 	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
-
-#file = urllib.request.urlopen("https://www.amsat.org/tle/current/nasabare.txt")
-#for line in file:
-#	list_tle.append(line.decode('utf-8').rstrip('\n\r'))
 
 for itn in range(0,len(list_tle),3):
 	nserie=list_tle[itn+1].split()[1]
