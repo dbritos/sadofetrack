@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-#import subprocess
-import subprocess
+
+import glob
 import pathlib
 import time
 import serial
@@ -10,28 +10,6 @@ import urllib.request
 import sattracker3
 import re
 import pickle
-def select_serial_port(event):
-	global serial_port_selected
-	serial_port_selected=event.widget.get()
-
-def change_serial_port():
-	status,output = subprocess.getstatusoutput("ls /dev/tty*")
-	serial_port_list =output.split('\n')
-	serial_port['values']= serial_port_list
-	if (serial_port_selected in serial_port['values']):
-		serial_port.current(serial_port_list.index(serial_port_selected))
-
-def select_serial_portAE(event):
-	global serial_portAE_selected
-	serial_portAE_selected=event.widget.get()
-
-def change_serial_portAE():
-	status,output = subprocess.getstatusoutput("ls /dev/tty*")
-	serial_port_list = output.split('\n')
-	serial_portAE['values']= serial_port_list
-	if (serial_portAE_selected in serial_portAE['values']):
-	 serial_portAE.current(serial_port_list.index(serial_portAE_selected))
-
 
 
 def calctracker(sat):
@@ -81,24 +59,36 @@ def save_data():
 	except:	lon = lon_entry.get()
 	tallinn = (lat,lon, "500")
 	with open('ft911a.pkl', 'wb') as f:
-	    pickle.dump([serial_port_selected,serial_portAE_selected,tallinn], f)
+	    pickle.dump([portx,serial_portAE_selected,tallinn], f)
 
 def start_scn():
 	global ser
-	portx=serial_port_selected
-	bps=38400
-	timex=5
-	ser=serial.Serial(portx,bps,timeout=timex)
-	global start_es
-	start_es = True
-	global Mode
-	Mode = True
+	portx = selected.get()
+
+	if portx =='':
+		serial_port.configure(style="R.TMenubutton")
+	else:
+		
+		print(portx)
+		bps=38400
+		timex=5
+		ser=serial.Serial(portx,bps,timeout=timex)
+		result=ser.write("FA;" .encode("ascii"))
+		data = port.read(11)
+		if dat==11
+			global start_es
+			start_es = True
+			global Mode
+			Mode = True
+			serial_port.configure(style="LG.TMenubutton")
+		else:
+			ser:ser.close()
 
 def stop_scn():
 	global start_es
 	start_es = False
 	global ser
-	ser.close()
+	if ser:ser.close()
 
 
 def output_tracker(A,Z):
@@ -109,9 +99,7 @@ def get_freq_mode():
 	ValidModes = {'USB':'2', 'LSB':'1', 'CW':'3', 'CWR':'3', 'RTTY':'6', 'RTTYR':'9', 'AM':'5', 'FM':'4', 'NFM':'4', 'AMS':'5', 'PKTLSB':'8', 'PKTUSB':'C', 'PKTFM':'A', 'ECSSUSB':'2', 'ECSSLSB':'1', 'FAX':'4', 'SAM':'5', 'SAL':'5', 'SAH':'5', 'DSB': '1','DMR':'E','':'4'}
 	Tone = {'67':'000','74.4':'003','77.0':'004','82.5':'006','88.5':'008','94.8':'010','103.5':'013','107.2':'014','110.9':'015','118.8':'017','123.0':'018','131.8':'020','136.5':'021'}
 
-#	ValidModes = ['USB', 'LSB', 'CW', 'CWR', 'RTTY', 'RTTYR', 'AM', 'FM', 'WFM', 'AMS', 'PKTLSB', 'PKTUSB', 'PKTFM', 'ECSSUSB', 'ECSSLSB', 'FAX', 'SAM', 'SAL', 'SAH', 'DSB','67Hz','']
-#	Modes = [       '2',  '1',   '3',  '3',    '6' ,    '9',   '5',  '4',  '4',   '5',   '8',       'C',      'A',       '2',     '1',      '4',    '5',   '5',   '5',   '1', '4','4']
-	if SatelliteAct !="":
+	if SatelliteAct != "":
 		get_satellite(SatelliteAct)
 		tracker = calctracker(SatelliteAct)
 		Sa = "Satellite         :" + SatelliteAct
@@ -132,6 +120,7 @@ def get_freq_mode():
 		FreqDownload.configure(text=FD)
 		if frec != 0:Dfrec = "FA" + str(int(frec)).zfill(9) + ";"
 		else:Dfrec = ""
+
 		try: Uf0  = float(Ufrequency)*1000
 		except:Uf0  = 0
 		frec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
@@ -147,13 +136,13 @@ def get_freq_mode():
 		BeaconL.configure(text=BF)
 		if frec!=0:Bfrec ="FA" + str(int(frec)).zfill(9) +";"
 		else:Bfrec = ""
+
 		R_freq = [Dfrec,Ufrec,Bfrec]
 		ToneCTCSS = dic_fqc[SatelliteAct]["CTCSS"].strip()
 		ModeD_rx = dic_fqc[SatelliteAct]["ModeD"].strip()
 		if ModeD_rx in ValidModes:
 			ModeDcmd = "MD0" + ValidModes[ModeD_rx] + ";"
 		else:
-#			ModeD_rx = ' '
 			ModeDcmd = ""
 		ModeD.configure(text="Mode:" + ModeD_rx)
 
@@ -161,7 +150,6 @@ def get_freq_mode():
 		if ModeU_tx in ValidModes:
 			ModeUcmd = "MD0" + ValidModes[ModeU_tx] + ";"
 		else:
-#			ModeU_tx = ' '
 			ModeUcmd = ""
 		ModeU.configure(text="Mode:" + ModeU_tx)
 
@@ -169,7 +157,6 @@ def get_freq_mode():
 		if ModeB_rx in ValidModes:
 			ModeBcmd = "MD0" + ValidModes[ModeB_rx] + ";"
 		else:
-#			ModeB_rx = ' '
 			ModeBcmd = ""
 		ModeB.configure(text="Mode:" + ModeB_rx)
 		if ToneCTCSS in Tone:
@@ -274,29 +261,42 @@ def SearchNear():
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
 root.geometry('670x700')
-
+stylegreen = Style(root)
+stylegred = Style(root)
+stylegreen.configure("LG.TMenubutton", background="lightgreen")
+stylegred.configure("R.TMenubutton", background="red")
+stylegred.configure("W.TMenubutton", background="white")
+global portx
 #get configuration file
 if pathlib.Path('ft911a.pkl').is_file():
 	with open('ft911a.pkl','rb') as f:  # Python 3: open(..., 'rb')
-	    serial_port_selected,serial_portAE_selected,tallinn = pickle.load(f)
+	    portx,serial_portAE_selected,tallinn = pickle.load(f)
 else:
-	serial_portAE_selected="/dev/tty"
-	serial_port_selected="/dev/tty"
+	serial_portAE_selected=""
+	portx=''
 	tallinn = (-31.319493,-64.273951, "500")
 SatNearList = list()
 #get serial port
+
 lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
-serial_port = Combobox(root,values = ["/dev/tty0"],postcommand = change_serial_port)
+
+
+options =glob.glob('/dev/tty[A-z]*')
+selected = StringVar(root)
+selected.set(options[0])
+serial_port = OptionMenu(root,selected,*options)
 serial_port.grid(column=1, row=0,sticky=W,  columnspan=2)
-serial_port.bind("<<ComboboxSelected>>", select_serial_port)
+serial_port.configure(style="W.TMenubutton")
 
 # Select serial for AE tracker
 lab_serialAE = Label(root, text="Serial Port AE:")
 lab_serialAE.grid(row=1, column=0,sticky=W,columnspan=1)
-serial_portAE = Combobox(root,values = ["/dev/tty0"],postcommand = change_serial_portAE)
+selectedAE = StringVar(root)
+selectedAE.set(options[0])
+serial_portAE = OptionMenu(root,selectedAE,*options)
 serial_portAE.grid(column=1, row=1,sticky=W,  columnspan=2)
-serial_portAE.bind("<<ComboboxSelected>>", select_serial_portAE)
+
 #get local coordinates
 lat_lb = Label(root, text="Latitude:")
 lat_lb.grid(row=2, column=0,sticky=W,columnspan=1)
