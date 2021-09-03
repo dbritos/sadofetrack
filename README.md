@@ -1,6 +1,12 @@
 # sadofetrack
 This project makes it possible to tune the emission frequency of the satellites and follow the frequency shift produced by the Doppler effect.
 
+# ft991atracker
+
+I\This is the version for Yaesu FT991a this program  not use hamlib the only lib to install is  ephem you can install this with:
+
+``sudo apt-get install -y python3-ephem``
+
 # Program requirements
 
 Have Rigctl installed
