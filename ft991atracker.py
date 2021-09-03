@@ -60,7 +60,8 @@ def save_data():
 			lon_entry.insert(0, "ERROR")
 	except:	lon = lon_entry.get()
 	tallinn = (lat,lon, "500")
-	print(portx,porty,tallinn)
+	portx = selected.get()
+	porty = selectedAE.get()
 	with open('ft911a.pkl', 'wb') as f:
 	    pickle.dump([portx,porty,tallinn], f)
 
@@ -96,12 +97,8 @@ def stop_scn():
 	if ser:ser.close()
 
 
-def output_tracker(A,Z):
-	output = "W " + A + " " + Z
-	ser.write(output)
-
 def get_freq_mode():
-	ValidModes = {'USB':'2', 'LSB':'1', 'CW':'3', 'CWR':'3', 'RTTY':'6', 'RTTYR':'9', 'AM':'5', 'FM':'4', 'NFM':'4', 'AMS':'5', 'PKTLSB':'8', 'PKTUSB':'C', 'PKTFM':'A', 'ECSSUSB':'2', 'ECSSLSB':'1', 'FAX':'4', 'SAM':'5', 'SAL':'5', 'SAH':'5', 'DSB': '1','DMR':'E','':'4'}
+	ValidModes = {'USB':'2', 'LSB':'1', 'CW':'3', 'CWR':'3', 'RTTY':'C', 'RTTYR':'C', 'AM':'5', 'FM':'4', 'NFM':'4', 'AMS':'5', 'PKTLSB':'8', 'PKTUSB':'C', 'PKTFM':'A', 'ECSSUSB':'2', 'ECSSLSB':'1', 'FAX':'A', 'SAM':'5', 'SAL':'5', 'SAH':'5', 'DSB': '1','DMR':'E','':'4'}
 	Tone = {'67':'000','74.4':'003','77.0':'004','82.5':'006','88.5':'008','94.8':'010','103.5':'013','107.2':'014','110.9':'015','118.8':'017','123.0':'018','131.8':'020','136.5':'021'}
 
 	if SatelliteAct != "":
@@ -128,10 +125,10 @@ def get_freq_mode():
 
 		try: Uf0  = float(Ufrequency)*1000
 		except:Uf0  = 0
-		frec = tracker.doppler(100e6)*Uf0 /100000000+Uf0
-		FU="Frequency Upload  :"+str(int(frec)) + " Hz"
+		frec = -tracker.doppler(100e6)*Uf0 /100000000+Uf0
+		FU="Frequency Upload  :" + str(int(frec)) + " Hz"
 		FreqUpload.configure(text=FU)
-		if frec !=0:Ufrec = "FB" + str(int(frec)).zfill(9) +";"
+		if frec !=0:Ufrec = "FB" + str(int(frec)).zfill(9) + ";"
 		else:Ufrec = ""
 
 		try: Bf0  =float(Bfrequency)*1000
@@ -186,7 +183,6 @@ def Control_freq():
 					result=ser.write("CT02;" .encode("ascii"))
 					if ModeUcmd:result=ser.write(ModeUcmd .encode("ascii"))
 					result=ser.write("AB;".encode("ascii"))
-					print("Write total bytes:",len(CTCSST),"-----",CTCSST,"\n")
 					if CTCSST: result=ser.write(CTCSST .encode("ascii"))
 					if checkDF.get()==1:
 						if ModeDcmd:result=ser.write(ModeDcmd .encode("ascii"))
@@ -276,17 +272,19 @@ if pathlib.Path('ft911a.pkl').is_file():
 else:
 	porty=''
 	portx=''
-	tallinn = (-31.319493,-64.273951, "500")
+	tallinn = (-31.319336,-64.273886, "500")
 SatNearList = list()
-#get serial port
 
+#get serial port
 lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
 
-
-options =glob.glob('/dev/tty[A-z]*')
+options =glob.glob('/dev/tty[T-U]*')
 selected = StringVar(root)
-selected.set(options[0])
+if portx in options:
+	selected.set(portx)
+else:
+	selected.set(options[0])
 serial_port = OptionMenu(root,selected,*options)
 serial_port.grid(column=1, row=0,sticky=W,  columnspan=3)
 serial_port.configure(style="W.TMenubutton")
