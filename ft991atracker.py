@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import sys
 import glob
 import pathlib
 import time
@@ -278,8 +278,12 @@ SatNearList = list()
 #get serial port
 lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
-
-options =glob.glob('/dev/tty[T-U]*')
+if sys.platform.startswith('win'):
+	ports = ['COM%s' % (i + 1) for i in range(256)]
+elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
+	# this excludes your current terminal "/dev/tty"
+	ports = glob.glob('/dev/tty[T-U]*')
+options =ports
 selected = StringVar(root)
 if portx in options:
 	selected.set(portx)
