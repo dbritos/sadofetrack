@@ -231,7 +231,7 @@ def nextpass():
 			if npt[0] != None and  npt[3] != None :
 				list_fqc[d][NEXPT] = ephem.localtime(npt[0])
 				list_fqc[d][NEXPE] = int(degrees(npt[3]))
-	root.after(10000, nextpass)
+	root.after(40000, nextpass)
 
 def InsertInListBox():
 
@@ -279,6 +279,7 @@ global porty
 global site 
 global satelite
 global tallinn
+geolist = ["35942","37809","33278",'36581',"40931","43700"]
 #get configuration file
 if pathlib.Path('ft911a.pkl').is_file():
 	with open('ft911a.pkl','rb') as f:  # Python 3: open(..., 'rb')
@@ -363,7 +364,7 @@ nextpasse ='neve'
 
 sel = False
 for itn in range(0,len(frec.freq )):
-	if  dic_tle.get(str(frec.freq[itn][0].strip())+"U")!=None:
+	if  dic_tle.get(str(frec.freq[itn][0].strip())+"U")!=None and str(frec.freq[itn][0].strip()) not in geolist:
 		item_fqc = [frec.freq[itn][1].strip(), 	#S
 		frec.freq[itn][0].strip(),				#N
 		frec.freq[itn][2].strip(),				#UP
@@ -432,7 +433,7 @@ ModeB = Label(root, text="Mode:",font="TkFixedFont")
 ModeB.grid(row=16,column=4, columnspan=4,sticky=W)
 Separator(root, orient='horizontal').grid(row=17,columnspan=9,sticky="ew")
 
-Label(root, text='Satellite Name  Paso              MaxE Elev Range  Satellite Description', font="TkFixedFont").grid(row=18,column=0, columnspan=9,sticky=W)
+Label(root, text='Satellite Name  Next Pass         MaxE Elev Range  Satellite Description', font="TkFixedFont").grid(row=18,column=0, columnspan=9,sticky=W)
 SatNear = Listbox(root, height=20, width=81,font="TkFixedFont",selectbackground='lightgreen',selectmode="single")
 SatNear.bind('<<ListboxSelect>>', SatSelected)
 SatNear.grid(row=19, columnspan=8,sticky=W)
