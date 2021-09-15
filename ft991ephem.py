@@ -41,19 +41,22 @@ def calctracker(sat,tof):
 	site.name        = 'test facility'
 	tle = list_fqc[sat][TLE]
 	satelite = ephem.readtle(tle['name'],tle['tle1'],tle['tle2'])
-	
-
 	satelite.compute(site)
+	elev=int("{:03.0f}".format(degrees(satelite.alt)))
 	if tof:
 		nexpt='never'
 		nexpe ='neve'
 		nexptint = 0
 		if str(satelite.circumpolar).find('False') ==0 and str(satelite.neverup).find('False') ==0  :
 			npt = site.next_pass(satelite)
-			if npt[0] != None and  npt[3] != None :
-				nexpt=ephem.localtime(npt[4])
+			if npt[0] != None and  npt[3] != None:
+				nexpt=ephem.localtime(npt[0])
 				nexpe=int(degrees(npt[3]))
-				nexptint = npt[4]
+				if elev  > 0:
+					nexptint = ephem.now()
+				else:
+					nexptint = npt[0]
+
 		return(nexpt,nexpe,nexptint)		
 	else:
 		
@@ -74,7 +77,7 @@ def SatSelected(event):
 		event.widget.activate (index)
 		list_fqc[index][SELECTED] = True
 		SatelliteAct = index
-		print(list_fqc[index])
+
 
 def save_data():
 	global tallinn
