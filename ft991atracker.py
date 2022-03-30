@@ -11,6 +11,8 @@ import re
 import pickle
 import ephem
 from math import *
+
+from sympy import failing_assumptions
 #constantes 
 SATELLITE =0
 NUMBER =1 
@@ -31,6 +33,8 @@ NAMBER =17
 NEXPT =15
 NEXPE =16
 ephemsat = -1
+global fain
+global mdin
 def calctracker(sat):
 	global site
 	global satelite
@@ -79,37 +83,58 @@ def save_data():
 	with open('ft911a.pkl', 'wb') as f:
 	    pickle.dump([portx,porty,tallinn], f)
 
-def start_scn():
+def setport(portx):
 	global ser
-	global portx
-	global porty
+	global start_es
+	global fain
+	global mdin
 	portx = selected.get()
-
 	if portx =='':
-		serial_port.configure(style="R.TMenubutton")
+		rig.configure(text="Select  Rig   ",foreground="black")
 	else:
 		bps=38400
 		timex=5
 		try: ser=serial.Serial(portx,bps,timeout=timex)
-		except:	serial_port.configure(style="R.TMenubutton")
+		except:
+			rig.configure(text="Rig not exist   ",foreground="red"	)
+			start_es = False
+			start['state'] = DISABLED
+			stop['state'] = DISABLED
 		else:
 			result=ser.write("FA;" .encode("ascii"))
-			data = ser.read(11)
-			if len(data)==11:
-				global start_es
-				start_es = True
-				global Mode
-				Mode = True
-				serial_port.configure(style="LG.TMenubutton")
+			fain = ser.read(12)
+			if len(fain)==12:			
+				start['state'] = NORMAL
+				rig.configure(text="Rig ok   ",foreground="green")
+				result=ser.write("MD0;" .encode("ascii"))
+				mdin = ser.read(5)
 			else:
 				if ser:ser.close()
-				serial_port.configure(style="R.TMenubutton")
-def stop_scn():
-	global start_es
-	start_es = False
-	global ser
-	if ser:ser.close()
+				rig.configure(text="Rig not exist   ",foreground="red")	
+				start_es = False
+				start['state'] = DISABLED	
+				stop['state'] = DISABLED	
 
+def start_scn():
+	global start_es
+	global Mode
+	start_es = True
+	Mode = True
+	stop['state'] = NORMAL
+	start['state'] = DISABLED
+
+def stop_scn():
+	global fain
+	global mdin
+	global start_es	
+	global ser
+	result=ser.write(str(fain.decode()).encode("ascii"))
+	result=ser.write(str(mdin.decode()).encode("ascii"))
+	result = ser.write("FT2;".encode("ascii"))
+
+	start_es = False
+	start['state'] = NORMAL
+	stop['state'] = DISABLED
 
 def get_freq_mode():
 	global site
@@ -197,7 +222,7 @@ def Control_freq():
 		if start_es:
 			if checkUF.get():
 				if Mode:
-					result=ser.write("QS;" .encode("ascii"))
+#					result=ser.write("QS;" .encode("ascii"))
 					result=ser.write("CT02;" .encode("ascii"))
 					if ModeUcmd:result=ser.write(ModeUcmd .encode("ascii"))
 					result=ser.write("AB;".encode("ascii"))
@@ -207,12 +232,14 @@ def Control_freq():
 					if checkDF.get()==2:
 						if ModeBcmd:result=ser.write(ModeBcmd .encode("ascii"))
 					Mode = False
+				
 				result=ser.write(Ufrec.encode("ascii"))
-
+				result = ser.write("FT3;".encode("ascii"))
 			if checkDF.get()==1:
 				result=ser.write(Dfrec.encode("ascii"))
 			if checkDF.get()==2:
 				result=ser.write(Bfrec.encode("ascii"))
+				
 	root.after(2000, Control_freq)
 
 def nextpass():
@@ -266,14 +293,11 @@ def InsertInListBox():
 	
 	root.after(5000, InsertInListBox)
 
+
 root = Tk()
 root.title("Satellite Doppler Ferequency Tracker")
 root.geometry('660x700')
-stylegreen = Style(root)
-stylegred = Style(root)
-stylegreen.configure("LG.TMenubutton", background="lightgreen")
-stylegred.configure("R.TMenubutton", background="red")
-stylegred.configure("W.TMenubutton", background="white")
+
 global portx
 global porty
 global site 
@@ -293,21 +317,23 @@ site.lat,site.lon,site.elevation = tallinn
 #get serial port
 lab_serial = Label(root, text="Serial Port Rig:")
 lab_serial.grid(row=0, column=0,sticky=W,columnspan=1)
+
 if sys.platform.startswith('win'):
 	ports = ['COM%s' % (i + 1) for i in range(256)]
 elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
 	# this excludes your current terminal "/dev/tty"
 	ports = glob.glob('/dev/tty[T-U]*')
-
+elif sys.platform.startswith('darwin'):
+	ports = glob.glob('/dev/cu.*')
 if not ports :ports = ['/dev/ttyUSB0']
-options =ports
+options = ports
 if options:
 	selected = StringVar(root)
 	if portx in options:
 		selected.set(portx)
 	else:
 		selected.set(options[0])
-	serial_port = OptionMenu(root,selected,*options)
+	serial_port = OptionMenu(root,selected,*options, command=setport)
 	serial_port.grid(column=1, row=0,sticky=W,  columnspan=3)
 	serial_port.configure(style="W.TMenubutton")
 
@@ -396,18 +422,19 @@ checDF = Radiobutton(root, text="Track Beacon Freq.",variable=checkDF, value=2)
 checDF.grid(column=0, row=6,columnspan=2,sticky=W)
 checUF = Checkbutton(root, text="Track Upload Freq.",variable=checkUF, onvalue=1, offvalue=0)
 checUF.grid(column=3, row=4,columnspan=2,sticky=W)
-
+rig = Label(root, text="Select  Rig   ",font="TkFixedFont")
+rig.grid(column=4,row=0,columnspan=2,sticky=W)
 #save configuration
 save = Button(root, text="Save", command=save_data)
 save.grid(column=6, row=0)
 start_es = False
 
 #start tracking
-start = Button(root, text="Start", command=start_scn)
+start = Button(root, text="Start",state=DISABLED, command=start_scn)
 start.grid(column=6, row=4)
 
 #stop tracking
-stop = Button(root, text="Stop", command=stop_scn)
+stop = Button(root, text="Stop",state=DISABLED, command=stop_scn)
 stop.grid(column=6, row=5)
 Separator(root, orient='horizontal').grid(row=9,columnspan=9,sticky="ew")
 #get parameter and control frequency receiver
@@ -440,7 +467,7 @@ SatNear.grid(row=19, columnspan=8,sticky=W)
 
 SatelliteAct = -1
 InsertInListBox()
-quit = Button(root, text="Quit", command = root.destroy)
+quit = Button(root, text="Quit", command =root.destroy)
 quit.grid(column=6, row=20)
 
 root.after(2000, InsertInListBox)
